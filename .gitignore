@@ -1,0 +1,297 @@
+# Sistema de Macroscopia Biomédica - .gitignore
+
+# Environment variables
+.env
+.env.local
+.env.production
+.env.staging
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer files
+*.dmg
+*.gz
+*.zip
+*.tar
+*.tar.gz
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Node.js / Frontend
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.eslintcache
+
+# React build
+frontend/build/
+frontend/dist/
+
+# Logs
+logs/
+*.log
+macroscopia.log
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+coverage/
+
+# AI Copilot/Claude files
+CLAUDE.md
+.claude/
+
+# nyc test coverage
+.nyc_output
+
+# Dependency directories
+jspm_packages/
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Microbundle cache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+database/
+*.db-journal
+
+# Upload files
+uploads/
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.bmp
+*.tiff
+*.webp
+*.mp3
+*.wav
+*.ogg
+*.mp4
+*.avi
+*.mov
+
+# Backup files
+backups/
+*.backup
+*.bak
+
+# IDE and Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Build artifacts
+build/dist/
+build/installer/
+*.pyc
+
+# PyInstaller executables
+build/macroscopia
+macroscopia
+macroscopia.exe
+
+# Temporary files
+temp/
+tmp/
+*.tmp
+
+# Configuration files with sensitive data (keep .example versions)
+config/.env
+config/production.env
+
+# User data directories
+.macroscopia/
+
+# SSL certificates
+*.key
+*.crt
+*.pem
+
+# Local development files
+local/
+dev/
+
+# Documentation build
+docs/_build/
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+target/
+
+# Celery stuff
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# Medical data (NEVER commit patient data)
+# These patterns ensure no medical files are accidentally committed
+*paciente*
+*patient*
+*medico*
+*medical*
+*biopsia*
+*biopsy*
+# Specific medical file extensions
+*.dcm
+*.dicom
+*.nii
+*.nii.gz
+
+# Backup and archive patterns
+*.7z
+*.rar
+*.tar.xz
+*.tar.bz2
+
+# IDE specific
+.vscode/settings.json
+.vscode/launch.json
+.vscode/extensions.json
+.claude
+
+# JetBrains
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Vim
+*.swp
+*.swo
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# Local History (Eclipse)
+.metadata
+.gradle
+.project
+.classpath
+
+# Text
+*.log
+*.txt
