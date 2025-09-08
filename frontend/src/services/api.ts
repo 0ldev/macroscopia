@@ -47,7 +47,7 @@ class ApiClient {
         if (error.response?.status === 401) {
           // Token expirado ou inválido
           localStorage.removeItem('access_token');
-          window.location.href = '/login';
+          // Don't redirect here, let the AuthContext handle it
         }
         return Promise.reject(error);
       }
@@ -70,9 +70,8 @@ class ApiClient {
     return response.data;
   }
 
-  async refreshToken(): Promise<TokenResponse> {
-    const response: AxiosResponse<TokenResponse> = await this.api.post('/auth/refresh');
-    return response.data;
+  async logout(): Promise<void> {
+    await this.api.post('/auth/logout');
   }
 
   // Métodos administrativos

@@ -28,13 +28,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const tokenResponse = await apiClient.login(credentials);
       const { access_token } = tokenResponse;
       
-      // Salvar token
-      if (credentials.remember) {
-        localStorage.setItem('access_token', access_token);
-      } else {
-        // Session only: keep in memory but ensure any previous persisted token is cleared
-        localStorage.removeItem('access_token');
-      }
+      // Salvar token sempre no localStorage para simplicidade do MVP
+      localStorage.setItem('access_token', access_token);
       setToken(access_token);
       
       // Obter dados do usuário atual
@@ -53,7 +48,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   // Função de logout
-  const logout = (): void => {
+  const logout = async (): Promise<void> => {
+    try {
+      // Call logout endpoint if token exists
+      if (token) {
+        await apiClient.logout();
+      }
+    } catch (error) {
+      console.error('Erro no logout:', error);
+      // Continue with logout even if API call fails
+    }
+    
     localStorage.removeItem('access_token');
     setToken(null);
     setUser(null);

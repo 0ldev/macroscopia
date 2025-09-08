@@ -1,30 +1,35 @@
 """
-Rotas de autenticação
+Rotas de autenticação simples para MVP
 """
-from datetime import datetime, timedelta
 from typing import Annotated
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi import APIRouter, Depends, HTTPException, status, Header
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from core.database import get_database_session
-from core.security import hash_senha, verificar_senha, criar_token_acesso, verificar_token
-from models.schemas import UserResponse, TokenResponse, LoginRequest
+from core.security import hash_senha, verificar_senha, criar_sessao, verificar_sessao, invalidar_sessao
+from models.schemas import UserResponse, TokenResponse
 from models.user import User
 from services.user_service import UserService
 from services.log_service import LogService
 
 
 router = APIRouter(prefix="/auth", tags=["autenticação"])
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
 
 def get_current_user(
-    token: Annotated[str, Depends(oauth2_scheme)], 
+    authorization: str = Header(None), 
     db: Session = Depends(get_database_session)
 ) -> User:
-    """Obtém o usuário atual baseado no token"""
-    payload = verificar_token(token)
-    username: str = payload.get("sub")
+    """Obtém o usuário atual baseado no token de sessão"""
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token de autorização necessário",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    token = authorization.replace("Bearer ", "")
+    username = verificar_sessao(token)
     
     user = db.query(User).filter(User.username == username).first()
     if user is None or not user.active:
@@ -48,8 +53,7 @@ def get_current_admin_user(current_user: User = Depends(get_current_user)) -> Us
 
 def get_current_user_from_token(token: str, db: Session) -> User:
     """Obtém o usuário atual baseado no token (para WebSocket)"""
-    payload = verificar_token(token)
-    username: str = payload.get("sub")
+    username = verificar_sessao(token)
     
     user = db.query(User).filter(User.username == username).first()
     if user is None or not user.active:
@@ -66,7 +70,7 @@ async def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_database_session)
 ):
-    """Endpoint de login"""
+    """Endpoint de login simples"""
     # Buscar usuário
     user = db.query(User).filter(User.username == form_data.username).first()
     
@@ -84,16 +88,8 @@ async def login(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    # Atualizar último login
-    user.last_login = datetime.utcnow()
-    db.commit()
-    
-    # Criar token
-    access_token_expires = timedelta(minutes=1440)  # 24 horas
-    access_token = criar_token_acesso(
-        data={"sub": user.username}, 
-        expires_delta=access_token_expires
-    )
+    # Criar sessão simples
+    session_token = criar_sessao(user.username)
     
     # Log do login bem-sucedido
     await LogService.create_log(
@@ -103,7 +99,7 @@ async def login(
         user_id=user.id
     )
     
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {"access_token": session_token, "token_type": "bearer"}
 
 
 @router.get("/me", response_model=UserResponse)
@@ -112,13 +108,14 @@ async def get_current_user_info(current_user: User = Depends(get_current_user)):
     return current_user
 
 
-@router.post("/refresh", response_model=TokenResponse)
-async def refresh_token(current_user: User = Depends(get_current_user)):
-    """Renova o token de acesso"""
-    access_token_expires = timedelta(minutes=1440)
-    access_token = criar_token_acesso(
-        data={"sub": current_user.username}, 
-        expires_delta=access_token_expires
-    )
+@router.post("/logout")
+async def logout(
+    authorization: str = Header(None),
+    current_user: User = Depends(get_current_user)
+):
+    """Logout simples"""
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.replace("Bearer ", "")
+        invalidar_sessao(token)
     
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {"message": "Logout realizado com sucesso"}

@@ -23,7 +23,7 @@ Sistema biomédico completo que combina visão computacional para medição de b
 - **Sobreposição visual** de medições em tempo real
 
 ### 🔧 **Sistema Robusto**
-- **Autenticação JWT** com níveis hierárquicos
+- **Autenticação simplificada** com sessões em memória (ideal para MVP)
 - **Banco SQLite** integrado com backup automático
 - **Sistema de logs** de auditoria completo
 - **API RESTful** com documentação Swagger
@@ -32,7 +32,7 @@ Sistema biomédico completo que combina visão computacional para medição de b
 
 ### Backend (Python/FastAPI)
 - FastAPI + SQLAlchemy ORM + SQLite
-- Autenticação JWT com BCrypt (fator de custo 12)
+- Autenticação simples com SHA256 + sessões em memória (MVP)
 - Integração OpenAI (Whisper + GPT-4 Mini com 8 funções estruturadas)
 - OpenCV para processamento de imagem e visão computacional
 - WebSocket para comunicação tempo real
@@ -45,11 +45,12 @@ Sistema biomédico completo que combina visão computacional para medição de b
 - Web Audio API para captura de áudio
 - WebRTC para acesso à webcam
 
-### Deployment
-- **PyInstaller** para executáveis Windows/Linux
-- **Launcher.py** como ponto de entrada unificado
-- **Scripts de build** automatizados para ambas plataformas
-- **Empacotamento completo** com dependências incluídas
+
+### Execução Suportada
+- **Windows:** `run.bat` (executa backend e frontend, instala dependências automaticamente)
+- **Linux/Mac:** `run.sh` (executa backend e frontend, instala dependências automaticamente)
+
+> **Atenção:** Não há suporte para binários compilados ou execução manual dos serviços. Use apenas os scripts fornecidos.
 
 ## 📁 Estrutura do Projeto
 
@@ -57,7 +58,7 @@ Sistema biomédico completo que combina visão computacional para medição de b
 macroscopia/
 ├── backend/                           # API Python FastAPI
 │   ├── api/                          # Rotas da API
-│   │   ├── auth.py                   # Autenticação JWT
+│   │   ├── auth.py                   # Autenticação simples
 │   │   ├── admin.py                  # Administração usuários
 │   │   ├── ai.py                     # Integração OpenAI/IA
 │   │   ├── analysis.py               # Análises biomédicas
@@ -66,7 +67,7 @@ macroscopia/
 │   ├── core/                         # Configurações centrais
 │   │   ├── config.py                 # Configurações sistema
 │   │   ├── database.py               # Conexão SQLite
-│   │   ├── security.py               # Segurança JWT/BCrypt
+│   │   ├── security.py               # Segurança SHA256/Sessions
 │   │   └── performance.py            # Monitor performance
 │   ├── models/                       # Modelos SQLAlchemy
 │   │   ├── user.py                   # Modelo usuário
@@ -104,13 +105,8 @@ macroscopia/
 │   │   └── index.tsx                 # Ponto entrada React
 │   ├── public/                       # Arquivos públicos estáticos
 │   └── package.json                  # Dependências Node.js
-├── build/                            # Sistema build executáveis
-│   ├── macroscopia.spec              # Spec PyInstaller
-│   ├── build_all.py                  # Build multiplataforma
-│   ├── build_linux.sh               # Build Linux
-│   ├── build_windows.bat             # Build Windows
-│   └── dist/                         # Executáveis gerados
-├── launcher.py                       # Launcher executável
+├── run.bat                           # Script de execução Windows
+├── run.sh                            # Script de execução Linux/Mac
 ├── functions.md                      # 8 funções estruturadas IA
 ├── prompt.md                         # Prompts especializados OpenAI
 ├── config/                           # Configurações ambiente
@@ -121,27 +117,13 @@ macroscopia/
 └── README.md                         # Documentação completa
 ```
 
-## 🛠️ Instalação e Execução
 
-## 🚀 Quick Start - Executáveis Prontos
 
-### Para Windows
-1. Baixe o arquivo `macroscopia-*-windows-*.zip`
-2. Extraia em uma pasta de sua escolha  
-3. Execute `run_macroscopia.bat`
-4. Aguarde o navegador abrir automaticamente
-5. Faça login com: **admin / admin**
 
-### Para Linux  
-1. Baixe o arquivo `macroscopia-*-linux-*.tar.gz`
-2. Extraia: `tar -xzf macroscopia-*-linux-*.tar.gz`
-3. Execute: `./run_macroscopia.sh`
-4. Aguarde o navegador abrir automaticamente
-5. Faça login com: **admin / admin**
+git clone <repository-url>
+cd macroscopia
 
----
-
-## 🔧 Desenvolvimento - Executar do Código Fonte
+## 🔧 Desenvolvimento e Execução
 
 ### Pré-requisitos
 - Python 3.8+ (recomendado 3.11+)
@@ -153,72 +135,35 @@ macroscopia/
 
 ```bash
 # Clonar repositório
-git clone <repository-url>
-cd macroscopia
+
+---
 
 # Configurar variáveis de ambiente
 cp config/.env.example config/.env
 # Editar config/.env com suas configurações
 ```
 
-### Backend (FastAPI)
+### Execução do Sistema
 
-```bash
-# Navegar para o backend
-cd backend
-
-# Criar ambiente virtual
-python -m venv venv
-
-# Ativar ambiente virtual
-# Linux/Mac:
-source venv/bin/activate
-# Windows:
-venv\Scripts\activate
-
-# Instalar dependências
-pip install -r requirements.txt
-
-# Executar servidor de desenvolvimento
-python main.py
+#### Windows
+```bat
+run.bat
 ```
+
+#### Linux/Mac
+```bash
+./run.sh
+```
+
+> Os scripts instalam dependências, configuram ambiente e executam backend e frontend automaticamente.
 
 **URLs disponíveis:**
 - Backend API: http://localhost:8000
 - Documentação Swagger: http://localhost:8000/docs
 - Health Check: http://localhost:8000/health
-
-### Frontend (React)
-
-```bash
-# Em outro terminal, navegar para frontend
-cd frontend
-
-# Instalar dependências
-npm install
-
-# Executar servidor de desenvolvimento
-npm start
-```
-
-**URLs disponíveis:**
 - Frontend: http://localhost:3000
-- Hot reload habilitado para desenvolvimento
 
-### Executar Sistema Completo
-
-```bash
-# Opção 1: Usar o launcher (recomendado)
-python launcher.py
-
-# Opção 2: Executar separadamente (desenvolvimento)
-# Terminal 1: Backend
-cd backend && python main.py
-# Terminal 2: Frontend  
-cd frontend && npm start
-```
-
----
+> **Não execute manualmente backend ou frontend. Use apenas os scripts `run.bat` ou `run.sh`.**
 
 ## 🔐 Credenciais e Acesso
 
@@ -241,7 +186,7 @@ cd frontend && npm start
 ### 🔐 Autenticação
 - `POST /auth/login` - Login usuário
 - `GET /auth/me` - Dados usuário atual  
-- `POST /auth/refresh` - Renovar token JWT
+- `POST /auth/logout` - Logout e invalidar sessão
 
 ### 👤 Administração (admins apenas)
 - `GET /admin/users` - Listar usuários
@@ -297,11 +242,10 @@ DATABASE_URL=sqlite:///./database/macroscopia.db
 DB_POOL_SIZE=20
 DB_MAX_OVERFLOW=10
 
-# === SEGURANÇA JWT ===  
+# === SEGURANÇA (MVP) ===  
+# Autenticação simples para MVP - SHA256 + sessões em memória
 SECRET_KEY=sua_chave_secreta_muito_longa_e_segura_aqui_256_bits
-JWT_EXPIRE_MINUTES=1440
-JWT_REFRESH_EXPIRE_DAYS=7
-BCRYPT_ROUNDS=12
+SESSION_TIMEOUT_MINUTES=1440
 
 # === INTEGRAÇÃO OPENAI ===
 OPENAI_API_KEY=sk-sua_chave_openai_aqui
@@ -360,7 +304,7 @@ BACKUP_RETENTION_DAYS=30
 
 ---
 
-## 📞 Suporte & Documentação
+## �📞 Suporte & Documentação
 
 ### Recursos Disponíveis
 - 📖 **API Docs:** http://localhost:8000/docs (Swagger completo)
@@ -383,17 +327,19 @@ BACKUP_RETENTION_DAYS=30
 
 
 ### Versão & Build Info
-- **Sistema:** Macroscopia Biomédica v1.0.0
-- **Python:** 3.8+ (testado até 3.12)
+- **Sistema:** Macroscopia Biomédica v1.0.0 (MVP)
+- **Python:** 3.8+ (testado até 3.13)
 - **Node.js:** 16+ (recomendado 18+)  
 - **Banco:** SQLite 3.x com backup automático
 - **AI:** OpenAI Whisper + GPT-4 Mini
 - **Vision:** OpenCV 4.x com otimizações
+- **Auth:** SHA256 + Sessions (MVP simplificado)
 
 ### Performance Specs
 - **Startup:** <10s sistema completo
 - **API Response:** <200ms média
 - **Memory:** <512MB uso típico
-- **Concurrent Users:** 50+ WebSocket simultâneos
+- **Concurrent Users:** 20+ sessões simultâneas (MVP)
 - **Vision Accuracy:** >95% medições automáticas
 - **AI Processing:** ~3-5s pipeline completa
+- **Security:** MVP-appropriate (sem overhead crypto)
