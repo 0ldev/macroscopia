@@ -95,13 +95,13 @@ class AudioService:
                 # Analisar o áudio capturado
                 audio_data = np.frombuffer(b''.join(frames), dtype=np.int16)
                 
-                # Calcular estatísticas
-                rms = np.sqrt(np.mean(audio_data.astype(np.float64)**2))
-                peak = np.max(np.abs(audio_data))
-                noise_floor = np.percentile(np.abs(audio_data), 10)
+                # Calcular estatísticas - conversão para tipos nativos Python
+                rms = float(np.sqrt(np.mean(audio_data.astype(np.float64)**2)))
+                peak = int(np.max(np.abs(audio_data)))
+                noise_floor = float(np.percentile(np.abs(audio_data), 10))
                 
-                # Detectar se há sinal
-                signal_detected = rms > 100  # Threshold para detectar som
+                # Detectar se há sinal - garantir boolean nativo
+                signal_detected = bool(rms > 100)  # Threshold para detectar som
                 
                 p.terminate()
                 
@@ -113,9 +113,9 @@ class AudioService:
                     "channels": CHANNELS,
                     "duration": duration,
                     "audio_stats": {
-                        "rms": float(rms),
-                        "peak": int(peak),
-                        "noise_floor": float(noise_floor),
+                        "rms": rms,
+                        "peak": peak,
+                        "noise_floor": noise_floor,
                         "signal_detected": signal_detected,
                         "samples_recorded": len(audio_data)
                     }

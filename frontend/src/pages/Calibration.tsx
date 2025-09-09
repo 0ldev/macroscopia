@@ -1,77 +1,69 @@
 /**
- * Página de calibração do sistema
+ * Página de calibração do sistema - Componentes individuais
  */
 import React, { useState, useEffect } from 'react';
 import {
   Box,
-  Stepper,
-  Step,
-  StepLabel,
   Paper,
   Container,
   Typography,
   Alert,
   Button,
   CircularProgress,
+  Grid,
+  Card,
+  CardContent,
+  CardActions,
+  Chip,
+  Divider,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Snackbar,
 } from '@mui/material';
 import {
   CameraAlt,
   Mic,
   GridOn,
   Preview,
-  Save,
+  CheckCircle,
+  Error,
+  Warning,
+  Settings,
+  PlayArrow,
 } from '@mui/icons-material';
 import Layout from '../components/Layout/Layout';
 import CameraSetup from '../components/Calibration/CameraSetup';
 import AudioSetup from '../components/Calibration/AudioSetup';
-// import GridDetection from '../components/Calibration/GridDetection';
-// import PreviewTest from '../components/Calibration/PreviewTest';
-import { CalibrationStep, CalibrationState, CameraSettings, AudioSettings } from '../types/calibration';
+import { CameraSettings, AudioSettings } from '../types/calibration';
 import { calibrationApi } from '../services/calibrationApi';
 import { useAuth } from '../contexts/AuthContext';
 
-const steps = [
-  {
-    key: 'camera_setup' as CalibrationStep,
-    label: 'Configurar Câmera',
-    icon: <CameraAlt />,
-    description: 'Configure sua webcam para captura de imagens'
-  },
-  {
-    key: 'audio_setup' as CalibrationStep,
-    label: 'Configurar Áudio',
-    icon: <Mic />,
-    description: 'Configure seu microfone para transcrição'
-  },
-  {
-    key: 'grid_detection' as CalibrationStep,
-    label: 'Detectar Grade',
-    icon: <GridOn />,
-    description: 'Configure o papel quadriculado para medições'
-  },
-  {
-    key: 'preview_test' as CalibrationStep,
-    label: 'Teste e Preview',
-    icon: <Preview />,
-    description: 'Teste final do sistema configurado'
-  },
-  {
-    key: 'save_config' as CalibrationStep,
-    label: 'Salvar Configuração',
-    icon: <Save />,
-    description: 'Salvar calibração no sistema'
-  }
-];
+interface ComponentCalibrationStatus {
+  camera: 'not_configured' | 'configured' | 'testing' | 'error';
+  audio: 'not_configured' | 'configured' | 'testing' | 'error';
+  grid: 'not_configured' | 'configured' | 'testing' | 'error';
+  preview: 'not_configured' | 'configured' | 'testing' | 'error';
+}
 
 const Calibration: React.FC = () => {
   const { user } = useAuth();
-  const [currentStep, setCurrentStep] = useState<CalibrationStep>('camera_setup');
-  const [calibrationState, setCalibrationState] = useState<CalibrationState>({
-    currentStep: 'camera_setup',
-    cameraIndex: -1,
-    audioDeviceIndex: -1,
-    gridSizeMm: 5.0,
-    cameraSettings: {
+  const [loading, setLoading] = useState(false);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
+  
+  // Estado de calibração individual
+  const [componentStatus, setComponentStatus] = useState<ComponentCalibrationStatus>({
+    camera: 'not_configured',
+    audio: 'not_configured', 
+    grid: 'not_configured',
+    preview: 'not_configured'
+  });
+  
+  // Estados individuais de configuração
+  const [cameraConfig, setCameraConfig] = useState({
+    index: -1,
+    settings: {
       resolution: { width: 1920, height: 1080 },
       fps: 30,
       brightness: 50,
@@ -79,8 +71,13 @@ const Calibration: React.FC = () => {
       saturation: 50,
       auto_focus: true,
       auto_white_balance: true,
-    },
-    audioSettings: {
+    } as CameraSettings,
+    calibrationId: null as number | null
+  });
+  
+  const [audioConfig, setAudioConfig] = useState({
+    deviceIndex: -1,
+    settings: {
       sample_rate: 44100,
       channels: 1,
       bit_depth: 16,
@@ -89,327 +86,593 @@ const Calibration: React.FC = () => {
       volume: 75,
       noise_suppression: true,
       auto_gain: true,
-    },
-    isValid: false,
-    errors: []
+    } as AudioSettings,
+    calibrationId: null as number | null
   });
   
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string>('');
-  const [success, setSuccess] = useState<string>('');
+  const [gridConfig, setGridConfig] = useState({
+    sizeMm: 5.0,
+    detectionConfidence: 0,
+    calibrationId: null as number | null
+  });
+  
+  // Dialog states
+  const [cameraDialog, setCameraDialog] = useState(false);
+  const [audioDialog, setAudioDialog] = useState(false);
+  const [gridDialog, setGridDialog] = useState(false);
 
-  // Carregar configurações padrão ao inicializar
+  // Carregar configurações existentes
   useEffect(() => {
-    loadDefaultSettings();
+    loadExistingCalibrations();
   }, []);
 
-  const loadDefaultSettings = async () => {
+  const loadExistingCalibrations = async () => {
     try {
       setLoading(true);
-      const defaultSettings = await calibrationApi.getDefaultSettings();
+      const currentCalibration = await calibrationApi.getCurrentCalibration();
       
-      setCalibrationState(prev => ({
-        ...prev,
-        cameraSettings: defaultSettings.camera,
-        audioSettings: defaultSettings.audio,
-        gridSizeMm: defaultSettings.grid_size_mm
-      }));
+      if (currentCalibration) {
+        // Atualizar estados baseado na calibração existente
+        if (currentCalibration.camera_settings) {
+          setCameraConfig(prev => ({
+            ...prev,
+            settings: currentCalibration.camera_settings as CameraSettings,
+            calibrationId: currentCalibration.id
+          }));
+          setComponentStatus(prev => ({ ...prev, camera: 'configured' }));
+        }
+        
+        if (currentCalibration.audio_settings) {
+          setAudioConfig(prev => ({
+            ...prev,
+            settings: currentCalibration.audio_settings as AudioSettings,
+            calibrationId: currentCalibration.id
+          }));
+          setComponentStatus(prev => ({ ...prev, audio: 'configured' }));
+        }
+        
+        if (currentCalibration.grid_size_mm) {
+          setGridConfig(prev => ({
+            ...prev,
+            sizeMm: currentCalibration.grid_size_mm,
+            calibrationId: currentCalibration.id
+          }));
+          setComponentStatus(prev => ({ ...prev, grid: 'configured' }));
+        }
+      }
     } catch (err: any) {
-      console.error('Erro ao carregar configurações padrão:', err);
-      setError('Erro ao carregar configurações padrão');
+      console.error('Erro ao carregar calibrações:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const getCurrentStepIndex = () => {
-    return steps.findIndex(step => step.key === currentStep);
-  };
-
-  const handleCameraChange = (index: number) => {
-    setCalibrationState(prev => ({
-      ...prev,
-      cameraIndex: index,
-      audioSettings: {
-        ...prev.audioSettings,
-        input_device: index // Assumir que o dispositivo de áudio padrão corresponde
-      }
-    }));
-  };
-
-  const handleAudioDeviceChange = (index: number) => {
-    setCalibrationState(prev => ({
-      ...prev,
-      audioDeviceIndex: index,
-      audioSettings: {
-        ...prev.audioSettings,
-        input_device: index
-      }
-    }));
-  };
-
-  const handleCameraSettingsChange = (settings: CameraSettings) => {
-    setCalibrationState(prev => ({
-      ...prev,
-      cameraSettings: settings
-    }));
-  };
-
-  const handleAudioSettingsChange = (settings: AudioSettings) => {
-    setCalibrationState(prev => ({
-      ...prev,
-      audioSettings: settings
-    }));
-  };
-
-  const nextStep = () => {
-    const currentIndex = getCurrentStepIndex();
-    if (currentIndex < steps.length - 1) {
-      const nextStepKey = steps[currentIndex + 1].key;
-      setCurrentStep(nextStepKey);
-      setCalibrationState(prev => ({
-        ...prev,
-        currentStep: nextStepKey
-      }));
-    }
-  };
-
-  const prevStep = () => {
-    const currentIndex = getCurrentStepIndex();
-    if (currentIndex > 0) {
-      const prevStepKey = steps[currentIndex - 1].key;
-      setCurrentStep(prevStepKey);
-      setCalibrationState(prev => ({
-        ...prev,
-        currentStep: prevStepKey
-      }));
-    }
-  };
-
-  const handleSaveCalibration = async () => {
+  // Salvar calibração individual da câmera
+  const saveCameraCalibration = async () => {
     try {
-      setLoading(true);
-      setError('');
+      setComponentStatus(prev => ({ ...prev, camera: 'testing' }));
+      
+      const calibrationData = {
+        grid_size_mm: gridConfig.sizeMm || 5.0,
+        camera_settings: cameraConfig.settings,
+        audio_settings: audioConfig.settings
+      };
+      
+      if (cameraConfig.calibrationId) {
+        await calibrationApi.updateCurrentCalibration(calibrationData);
+      } else {
+        const newCalibration = await calibrationApi.createCalibration(calibrationData);
+        setCameraConfig(prev => ({ ...prev, calibrationId: newCalibration.id }));
+      }
+      
+      setComponentStatus(prev => ({ ...prev, camera: 'configured' }));
+      setSnackbar({ open: true, message: 'Calibração da câmera salva com sucesso!', severity: 'success' });
+      setCameraDialog(false);
+      
+      // Atualizar todas as configurações para manter consistência
+      await loadExistingCalibrations();
+      
+    } catch (err: any) {
+      setComponentStatus(prev => ({ ...prev, camera: 'error' }));
+      setSnackbar({ open: true, message: `Erro ao salvar calibração da câmera: ${err.message}`, severity: 'error' });
+    }
+  };
 
-      // Criar calibração completa
-      const calibration = await calibrationApi.performFullCalibration(
-        calibrationState.cameraIndex,
-        calibrationState.audioDeviceIndex,
-        calibrationState.gridSizeMm,
-        calibrationState.cameraSettings,
-        calibrationState.audioSettings
+  // Salvar calibração individual do áudio
+  const saveAudioCalibration = async () => {
+    try {
+      setComponentStatus(prev => ({ ...prev, audio: 'testing' }));
+      
+      const calibrationData = {
+        grid_size_mm: gridConfig.sizeMm || 5.0,
+        camera_settings: cameraConfig.settings,
+        audio_settings: audioConfig.settings
+      };
+      
+      if (audioConfig.calibrationId) {
+        await calibrationApi.updateCurrentCalibration(calibrationData);
+      } else {
+        const newCalibration = await calibrationApi.createCalibration(calibrationData);
+        setAudioConfig(prev => ({ ...prev, calibrationId: newCalibration.id }));
+      }
+      
+      setComponentStatus(prev => ({ ...prev, audio: 'configured' }));
+      setSnackbar({ open: true, message: 'Calibração do áudio salva com sucesso!', severity: 'success' });
+      setAudioDialog(false);
+      
+      // Atualizar todas as configurações para manter consistência
+      await loadExistingCalibrations();
+      
+    } catch (err: any) {
+      setComponentStatus(prev => ({ ...prev, audio: 'error' }));
+      setSnackbar({ open: true, message: `Erro ao salvar calibração do áudio: ${err.message}`, severity: 'error' });
+    }
+  };
+
+  // Salvar calibração individual da grade
+  const saveGridCalibration = async () => {
+    try {
+      setComponentStatus(prev => ({ ...prev, grid: 'testing' }));
+      
+      // Testar detecção da grade primeiro
+      const gridTest = await calibrationApi.detectGrid(cameraConfig.index, gridConfig.sizeMm);
+      
+      if (gridTest.grid_detected && gridTest.grid_info.confidence > 0.7) {
+        const calibrationData = {
+          grid_size_mm: gridConfig.sizeMm,
+          camera_settings: cameraConfig.settings,
+          audio_settings: audioConfig.settings
+        };
+        
+        if (gridConfig.calibrationId) {
+          await calibrationApi.updateCurrentCalibration(calibrationData);
+        } else {
+          const newCalibration = await calibrationApi.createCalibration(calibrationData);
+          setGridConfig(prev => ({ ...prev, calibrationId: newCalibration.id }));
+        }
+        
+        setGridConfig(prev => ({ ...prev, detectionConfidence: gridTest.grid_info.confidence }));
+        setComponentStatus(prev => ({ ...prev, grid: 'configured' }));
+        setSnackbar({ open: true, message: `Calibração da grade salva! Confiança: ${(gridTest.grid_info.confidence * 100).toFixed(1)}%`, severity: 'success' });
+        setGridDialog(false);
+        
+        // Atualizar todas as configurações para manter consistência
+        await loadExistingCalibrations();
+        
+      } else {
+        setComponentStatus(prev => ({ ...prev, grid: 'error' }));
+        setSnackbar({ open: true, message: 'Falha na detecção da grade. Verifique o posicionamento do papel quadriculado.', severity: 'error' });
+      }
+      
+    } catch (err: any) {
+      setComponentStatus(prev => ({ ...prev, grid: 'error' }));
+      setSnackbar({ open: true, message: `Erro ao calibrar grade: ${err.message}`, severity: 'error' });
+    }
+  };
+
+  // Testar sistema completo
+  const testCompleteSystem = async () => {
+    try {
+      setComponentStatus(prev => ({ ...prev, preview: 'testing' }));
+      
+      // Validar todas as configurações
+      const validation = await calibrationApi.validateSettings(
+        cameraConfig.settings,
+        audioConfig.settings
       );
-
-      setSuccess('Calibração salva com sucesso!');
-      console.log('Calibração criada:', calibration);
       
-      // Opcional: redirecionar para dashboard após alguns segundos
-      setTimeout(() => {
-        window.location.href = '/';
-      }, 3000);
+      if (validation.camera_valid && validation.audio_valid) {
+        setComponentStatus(prev => ({ ...prev, preview: 'configured' }));
+        setSnackbar({ open: true, message: 'Sistema testado com sucesso! Todas as configurações estão válidas.', severity: 'success' });
+      } else {
+        setComponentStatus(prev => ({ ...prev, preview: 'error' }));
+        setSnackbar({ open: true, message: `Teste falhou: ${validation.camera_valid ? '' : 'Câmera inválida. '} ${validation.audio_valid ? '' : 'Áudio inválido.'}`, severity: 'error' });
+      }
       
     } catch (err: any) {
-      setError(`Erro ao salvar calibração: ${err.message}`);
-    } finally {
-      setLoading(false);
+      setComponentStatus(prev => ({ ...prev, preview: 'error' }));
+      setSnackbar({ open: true, message: `Erro no teste: ${err.message}`, severity: 'error' });
     }
   };
 
-  const renderCurrentStep = () => {
-    switch (currentStep) {
-      case 'camera_setup':
-        return (
-          <CameraSetup
-            selectedCamera={calibrationState.cameraIndex}
-            onCameraChange={handleCameraChange}
-            cameraSettings={calibrationState.cameraSettings}
-            onSettingsChange={handleCameraSettingsChange}
-            onNext={nextStep}
-          />
-        );
-      
-      case 'audio_setup':
-        return (
-          <AudioSetup
-            selectedDevice={calibrationState.audioDeviceIndex}
-            onDeviceChange={handleAudioDeviceChange}
-            audioSettings={calibrationState.audioSettings}
-            onSettingsChange={handleAudioSettingsChange}
-            onNext={nextStep}
-            onBack={prevStep}
-          />
-        );
-      
-      case 'grid_detection':
-        return (
-          <Box sx={{ textAlign: 'center', py: 8 }}>
-            <GridOn sx={{ fontSize: 64, color: 'primary.main', mb: 2 }} />
-            <Typography variant="h4" gutterBottom>
-              Detecção de Grade
-            </Typography>
-            <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
-              Esta funcionalidade será implementada na próxima fase.
-            </Typography>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', maxWidth: 400, mx: 'auto' }}>
-              <Button variant="outlined" onClick={prevStep}>
-                Voltar
-              </Button>
-              <Button variant="contained" onClick={nextStep}>
-                Próximo
-              </Button>
-            </Box>
-          </Box>
-        );
-      
-      case 'preview_test':
-        return (
-          <Box sx={{ textAlign: 'center', py: 8 }}>
-            <Preview sx={{ fontSize: 64, color: 'primary.main', mb: 2 }} />
-            <Typography variant="h4" gutterBottom>
-              Teste e Preview
-            </Typography>
-            <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
-              Esta funcionalidade será implementada na próxima fase.
-            </Typography>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', maxWidth: 400, mx: 'auto' }}>
-              <Button variant="outlined" onClick={prevStep}>
-                Voltar
-              </Button>
-              <Button variant="contained" onClick={nextStep}>
-                Próximo
-              </Button>
-            </Box>
-          </Box>
-        );
-      
-      case 'save_config':
-        return (
-          <Box sx={{ textAlign: 'center', py: 8 }}>
-            <Save sx={{ fontSize: 64, color: 'primary.main', mb: 2 }} />
-            <Typography variant="h4" gutterBottom>
-              Salvar Configuração
-            </Typography>
-            <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
-              Finalize a calibração salvando suas configurações no sistema.
+  const getStatusIcon = (status: ComponentCalibrationStatus[keyof ComponentCalibrationStatus]) => {
+    switch (status) {
+      case 'configured': return <CheckCircle color="success" />;
+      case 'testing': return <CircularProgress size={20} />;
+      case 'error': return <Error color="error" />;
+      default: return <Warning color="warning" />;
+    }
+  };
+
+  const getStatusColor = (status: ComponentCalibrationStatus[keyof ComponentCalibrationStatus]): "default" | "primary" | "secondary" | "error" | "info" | "success" | "warning" => {
+    switch (status) {
+      case 'configured': return 'success';
+      case 'testing': return 'info';
+      case 'error': return 'error';
+      default: return 'warning';
+    }
+  };
+
+  const getStatusText = (status: ComponentCalibrationStatus[keyof ComponentCalibrationStatus]) => {
+    switch (status) {
+      case 'configured': return 'Configurado';
+      case 'testing': return 'Testando...';
+      case 'error': return 'Erro';
+      default: return 'Não Configurado';
+    }
+  };
+
+  return (
+    <Layout>
+      <Container maxWidth="lg" sx={{ py: 3 }}>
+        <Paper sx={{ p: 3 }}>
+          <Typography variant="h4" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Settings />
+            Calibração do Sistema - Componentes Individuais
+          </Typography>
+          
+          <Typography variant="body1" color="textSecondary" sx={{ mb: 3 }}>
+            Configure cada componente do sistema individualmente. Você pode calibrar e salvar as configurações de cada componente separadamente.
+          </Typography>
+
+          <Grid container spacing={3}>
+            {/* Componente Câmera */}
+            <Grid item xs={12} md={6}>
+              <Card sx={{ height: '100%' }}>
+                <CardContent>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                    <CameraAlt color="primary" />
+                    <Typography variant="h6">
+                      Configuração da Câmera
+                    </Typography>
+                    <Box sx={{ ml: 'auto' }}>
+                      <Chip 
+                        icon={getStatusIcon(componentStatus.camera)}
+                        label={getStatusText(componentStatus.camera)}
+                        color={getStatusColor(componentStatus.camera)}
+                        size="small"
+                      />
+                    </Box>
+                  </Box>
+                  
+                  <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+                    Configure sua webcam para captura de imagens de alta qualidade das amostras.
+                  </Typography>
+                  
+                  {componentStatus.camera === 'configured' && (
+                    <Box sx={{ mb: 2 }}>
+                      <Typography variant="caption" color="success.main">
+                        ✓ Câmera configurada: Resolução {cameraConfig.settings.resolution.width}x{cameraConfig.settings.resolution.height}, {cameraConfig.settings.fps}fps
+                      </Typography>
+                    </Box>
+                  )}
+                </CardContent>
+                
+                <CardActions>
+                  <Button 
+                    variant="contained" 
+                    startIcon={<Settings />}
+                    onClick={() => setCameraDialog(true)}
+                    disabled={componentStatus.camera === 'testing'}
+                  >
+                    Configurar Câmera
+                  </Button>
+                </CardActions>
+              </Card>
+            </Grid>
+
+            {/* Componente Áudio */}
+            <Grid item xs={12} md={6}>
+              <Card sx={{ height: '100%' }}>
+                <CardContent>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                    <Mic color="primary" />
+                    <Typography variant="h6">
+                      Configuração do Áudio
+                    </Typography>
+                    <Box sx={{ ml: 'auto' }}>
+                      <Chip 
+                        icon={getStatusIcon(componentStatus.audio)}
+                        label={getStatusText(componentStatus.audio)}
+                        color={getStatusColor(componentStatus.audio)}
+                        size="small"
+                      />
+                    </Box>
+                  </Box>
+                  
+                  <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+                    Configure seu microfone para transcrição automática de laudos médicos.
+                  </Typography>
+                  
+                  {componentStatus.audio === 'configured' && (
+                    <Box sx={{ mb: 2 }}>
+                      <Typography variant="caption" color="success.main">
+                        ✓ Áudio configurado: {audioConfig.settings.sample_rate}Hz, {audioConfig.settings.channels} canal, Volume {audioConfig.settings.volume}%
+                      </Typography>
+                    </Box>
+                  )}
+                </CardContent>
+                
+                <CardActions>
+                  <Button 
+                    variant="contained" 
+                    startIcon={<Settings />}
+                    onClick={() => setAudioDialog(true)}
+                    disabled={componentStatus.audio === 'testing'}
+                  >
+                    Configurar Áudio
+                  </Button>
+                </CardActions>
+              </Card>
+            </Grid>
+
+            {/* Componente Grade */}
+            <Grid item xs={12} md={6}>
+              <Card sx={{ height: '100%' }}>
+                <CardContent>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                    <GridOn color="primary" />
+                    <Typography variant="h6">
+                      Detecção de Grade
+                    </Typography>
+                    <Box sx={{ ml: 'auto' }}>
+                      <Chip 
+                        icon={getStatusIcon(componentStatus.grid)}
+                        label={getStatusText(componentStatus.grid)}
+                        color={getStatusColor(componentStatus.grid)}
+                        size="small"
+                      />
+                    </Box>
+                  </Box>
+                  
+                  <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+                    Calibre o sistema para detectar automaticamente o papel quadriculado para medições precisas.
+                  </Typography>
+                  
+                  {componentStatus.grid === 'configured' && (
+                    <Box sx={{ mb: 2 }}>
+                      <Typography variant="caption" color="success.main">
+                        ✓ Grade configurada: {gridConfig.sizeMm}mm, Confiança: {(gridConfig.detectionConfidence * 100).toFixed(1)}%
+                      </Typography>
+                    </Box>
+                  )}
+                </CardContent>
+                
+                <CardActions>
+                  <Button 
+                    variant="contained" 
+                    startIcon={<GridOn />}
+                    onClick={() => setGridDialog(true)}
+                    disabled={componentStatus.grid === 'testing' || componentStatus.camera !== 'configured'}
+                  >
+                    Calibrar Grade
+                  </Button>
+                </CardActions>
+              </Card>
+            </Grid>
+
+            {/* Componente Teste Completo */}
+            <Grid item xs={12} md={6}>
+              <Card sx={{ height: '100%' }}>
+                <CardContent>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                    <Preview color="primary" />
+                    <Typography variant="h6">
+                      Teste do Sistema
+                    </Typography>
+                    <Box sx={{ ml: 'auto' }}>
+                      <Chip 
+                        icon={getStatusIcon(componentStatus.preview)}
+                        label={getStatusText(componentStatus.preview)}
+                        color={getStatusColor(componentStatus.preview)}
+                        size="small"
+                      />
+                    </Box>
+                  </Box>
+                  
+                  <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+                    Execute um teste completo do sistema para validar todas as configurações.
+                  </Typography>
+                  
+                  {componentStatus.preview === 'configured' && (
+                    <Box sx={{ mb: 2 }}>
+                      <Typography variant="caption" color="success.main">
+                        ✓ Sistema testado: Todas as configurações válidas
+                      </Typography>
+                    </Box>
+                  )}
+                </CardContent>
+                
+                <CardActions>
+                  <Button 
+                    variant="contained" 
+                    startIcon={<PlayArrow />}
+                    onClick={testCompleteSystem}
+                    disabled={componentStatus.preview === 'testing' || 
+                             componentStatus.camera !== 'configured' || 
+                             componentStatus.audio !== 'configured'}
+                  >
+                    Testar Sistema
+                  </Button>
+                </CardActions>
+              </Card>
+            </Grid>
+          </Grid>
+
+          {/* Status Geral */}
+          <Box sx={{ mt: 3 }}>
+            <Divider sx={{ mb: 2 }} />
+            <Typography variant="h6" gutterBottom>
+              Status Geral do Sistema
             </Typography>
             
-            {/* Resumo da configuração */}
-            <Paper elevation={1} sx={{ p: 3, mb: 4, textAlign: 'left', maxWidth: 600, mx: 'auto' }}>
-              <Typography variant="h6" gutterBottom>
-                Resumo da Calibração
-              </Typography>
-              <Typography variant="body2" sx={{ mb: 1 }}>
-                <strong>Câmera:</strong> Índice {calibrationState.cameraIndex} 
-                ({calibrationState.cameraSettings.resolution.width}x{calibrationState.cameraSettings.resolution.height})
-              </Typography>
-              <Typography variant="body2" sx={{ mb: 1 }}>
-                <strong>Áudio:</strong> Dispositivo {calibrationState.audioDeviceIndex} 
-                ({calibrationState.audioSettings.sample_rate}Hz, {calibrationState.audioSettings.channels} canal)
-              </Typography>
-              <Typography variant="body2">
-                <strong>Grade:</strong> {calibrationState.gridSizeMm}mm
-              </Typography>
-            </Paper>
+            <Grid container spacing={2}>
+              <Grid item xs={6} sm={3}>
+                <Box sx={{ textAlign: 'center' }}>
+                  {getStatusIcon(componentStatus.camera)}
+                  <Typography variant="caption" display="block">Câmera</Typography>
+                </Box>
+              </Grid>
+              <Grid item xs={6} sm={3}>
+                <Box sx={{ textAlign: 'center' }}>
+                  {getStatusIcon(componentStatus.audio)}
+                  <Typography variant="caption" display="block">Áudio</Typography>
+                </Box>
+              </Grid>
+              <Grid item xs={6} sm={3}>
+                <Box sx={{ textAlign: 'center' }}>
+                  {getStatusIcon(componentStatus.grid)}
+                  <Typography variant="caption" display="block">Grade</Typography>
+                </Box>
+              </Grid>
+              <Grid item xs={6} sm={3}>
+                <Box sx={{ textAlign: 'center' }}>
+                  {getStatusIcon(componentStatus.preview)}
+                  <Typography variant="caption" display="block">Sistema</Typography>
+                </Box>
+              </Grid>
+            </Grid>
             
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', maxWidth: 400, mx: 'auto' }}>
-              <Button variant="outlined" onClick={prevStep} disabled={loading}>
-                Voltar
+            {Object.values(componentStatus).every(status => status === 'configured') && (
+              <Alert severity="success" sx={{ mt: 2 }}>
+                ✅ Sistema completamente calibrado! Todas as configurações estão válidas e salvas.
+              </Alert>
+            )}
+          </Box>
+
+          {/* Dialogs para configuração individual */}
+          
+          {/* Dialog Câmera */}
+          <Dialog open={cameraDialog} onClose={() => setCameraDialog(false)} maxWidth="md" fullWidth>
+            <DialogTitle>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <CameraAlt />
+                Configuração da Câmera
+              </Box>
+            </DialogTitle>
+            <DialogContent>
+              <CameraSetup
+                selectedCamera={cameraConfig.index}
+                cameraSettings={cameraConfig.settings}
+                onCameraChange={(index) => setCameraConfig(prev => ({ ...prev, index }))}
+                onSettingsChange={(settings) => setCameraConfig(prev => ({ ...prev, settings }))}
+                onNext={() => {}} // Not needed in dialog mode
+              />
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setCameraDialog(false)}>
+                Cancelar
               </Button>
               <Button 
                 variant="contained" 
-                onClick={handleSaveCalibration}
-                disabled={loading}
-                startIcon={loading ? <CircularProgress size={20} /> : <Save />}
+                onClick={saveCameraCalibration}
+                disabled={cameraConfig.index === -1 || componentStatus.camera === 'testing'}
               >
-                {loading ? 'Salvando...' : 'Salvar Calibração'}
+                {componentStatus.camera === 'testing' ? (
+                  <CircularProgress size={20} />
+                ) : (
+                  'Salvar Configuração'
+                )}
               </Button>
-            </Box>
-          </Box>
-        );
-      
-      default:
-        return null;
-    }
-  };
+            </DialogActions>
+          </Dialog>
 
-  if (loading && currentStep === 'camera_setup') {
-    return (
-      <Layout>
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
-          <CircularProgress size={48} />
-        </Box>
-      </Layout>
-    );
-  }
+          {/* Dialog Áudio */}
+          <Dialog open={audioDialog} onClose={() => setAudioDialog(false)} maxWidth="md" fullWidth>
+            <DialogTitle>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Mic />
+                Configuração do Áudio
+              </Box>
+            </DialogTitle>
+            <DialogContent>
+              <AudioSetup
+                selectedDevice={audioConfig.deviceIndex}
+                audioSettings={audioConfig.settings}
+                onDeviceChange={(index) => setAudioConfig(prev => ({ ...prev, deviceIndex: index }))}
+                onSettingsChange={(settings) => setAudioConfig(prev => ({ ...prev, settings }))}
+                onNext={() => {}} // Not needed in dialog mode
+                onBack={() => {}} // Not needed in dialog mode
+              />
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setAudioDialog(false)}>
+                Cancelar
+              </Button>
+              <Button 
+                variant="contained" 
+                onClick={saveAudioCalibration}
+                disabled={audioConfig.deviceIndex === -1 || componentStatus.audio === 'testing'}
+              >
+                {componentStatus.audio === 'testing' ? (
+                  <CircularProgress size={20} />
+                ) : (
+                  'Salvar Configuração'
+                )}
+              </Button>
+            </DialogActions>
+          </Dialog>
 
-  return (
-    <Layout maxWidth="lg">
-      <Container>
-        {/* Cabeçalho */}
-        <Box sx={{ mb: 4 }}>
-          <Typography variant="h4" gutterBottom>
-            Calibração do Sistema
-          </Typography>
-          <Typography variant="body1" color="text.secondary">
-            Configure sua webcam, microfone e papel quadriculado para usar o sistema de macroscopia.
-          </Typography>
-        </Box>
-
-        {/* Alertas */}
-        {error && (
-          <Alert severity="error" sx={{ mb: 3 }}>
-            {error}
-          </Alert>
-        )}
-
-        {success && (
-          <Alert severity="success" sx={{ mb: 3 }}>
-            {success}
-          </Alert>
-        )}
-
-        {/* Stepper */}
-        <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
-          <Stepper activeStep={getCurrentStepIndex()} alternativeLabel>
-            {steps.map((step, index) => (
-              <Step key={step.key}>
-                <StepLabel
-                  StepIconComponent={() => (
-                    <Box
-                      sx={{
-                        width: 40,
-                        height: 40,
-                        borderRadius: '50%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        backgroundColor: index <= getCurrentStepIndex() ? 'primary.main' : 'grey.300',
-                        color: index <= getCurrentStepIndex() ? 'white' : 'grey.500',
-                      }}
-                    >
-                      {step.icon}
-                    </Box>
-                  )}
-                >
-                  <Typography variant="subtitle2">
-                    {step.label}
+          {/* Dialog Grade */}
+          <Dialog open={gridDialog} onClose={() => setGridDialog(false)} maxWidth="sm" fullWidth>
+            <DialogTitle>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <GridOn />
+                Calibração da Grade
+              </Box>
+            </DialogTitle>
+            <DialogContent>
+              <Box sx={{ py: 2 }}>
+                <Typography variant="body2" color="textSecondary" sx={{ mb: 3 }}>
+                  Posicione o papel quadriculado na frente da câmera e clique em "Detectar Grade" para calibrar o sistema de medição.
+                </Typography>
+                
+                <Typography variant="body2" sx={{ mb: 1 }}>
+                  <strong>Tamanho da grade:</strong> {gridConfig.sizeMm}mm
+                </Typography>
+                
+                {gridConfig.detectionConfidence > 0 && (
+                  <Typography variant="body2" color="success.main">
+                    <strong>Última detecção:</strong> {(gridConfig.detectionConfidence * 100).toFixed(1)}% de confiança
                   </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {step.description}
-                  </Typography>
-                </StepLabel>
-              </Step>
-            ))}
-          </Stepper>
-        </Paper>
+                )}
+              </Box>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setGridDialog(false)}>
+                Cancelar
+              </Button>
+              <Button 
+                variant="contained" 
+                onClick={saveGridCalibration}
+                disabled={componentStatus.grid === 'testing'}
+              >
+                {componentStatus.grid === 'testing' ? (
+                  <CircularProgress size={20} />
+                ) : (
+                  'Detectar e Salvar Grade'
+                )}
+              </Button>
+            </DialogActions>
+          </Dialog>
 
-        {/* Conteúdo do passo atual */}
-        <Paper elevation={2} sx={{ p: 4 }}>
-          {renderCurrentStep()}
+          {/* Snackbar para notificações */}
+          <Snackbar 
+            open={snackbar.open} 
+            autoHideDuration={6000} 
+            onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
+          >
+            <Alert 
+              onClose={() => setSnackbar(prev => ({ ...prev, open: false }))} 
+              severity={snackbar.severity}
+              sx={{ width: '100%' }}
+            >
+              {snackbar.message}
+            </Alert>
+          </Snackbar>
         </Paper>
       </Container>
     </Layout>
   );
 };
-
 export default Calibration;

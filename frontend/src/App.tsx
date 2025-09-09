@@ -19,6 +19,8 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Calibration from './pages/Calibration';
 import Analysis from './pages/Analysis';
+import Admin from './pages/Admin';
+import Historico from './pages/Historico';
 
 // Componente de rota protegida
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -92,10 +94,7 @@ const AppRoutes: React.FC = () => {
           path="/analysis"
           element={
             <ProtectedRoute>
-              <Box sx={{ p: 3, textAlign: 'center' }}>
-                <h2>Página de Análise</h2>
-                <p>Esta página será implementada na próxima fase.</p>
-              </Box>
+              <Analysis />
             </ProtectedRoute>
           }
         />
@@ -104,10 +103,7 @@ const AppRoutes: React.FC = () => {
           path="/history"
           element={
             <ProtectedRoute>
-              <Box sx={{ p: 3, textAlign: 'center' }}>
-                <h2>Histórico de Análises</h2>
-                <p>Esta página será implementada na próxima fase.</p>
-              </Box>
+              <Historico />
             </ProtectedRoute>
           }
         />
@@ -125,10 +121,7 @@ const AppRoutes: React.FC = () => {
           path="/admin"
           element={
             <ProtectedRoute>
-              <Box sx={{ p: 3, textAlign: 'center' }}>
-                <h2>Administração</h2>
-                <p>Esta página será implementada na próxima fase.</p>
-              </Box>
+              <Admin />
             </ProtectedRoute>
           }
         />

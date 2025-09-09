@@ -568,3 +568,72 @@ async def get_default_settings(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Erro ao obter configurações padrão: {str(e)}"
         )
+
+
+@router.get("/system-status")
+async def get_system_status(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_database_session)
+):
+    """Obtém o status atual do sistema de calibração para o dashboard"""
+    try:
+        # Obter a calibração mais recente do usuário
+        current_calibration = CalibrationService.get_latest_calibration(db, current_user.id)
+        
+        status = {
+            "camera": {
+                "configured": False,
+                "label": "Configurar"
+            },
+            "audio": {
+                "configured": False,
+                "label": "Configurar"
+            },
+            "grid": {
+                "configured": False,
+                "label": "Configurar"
+            },
+            "overall": {
+                "configured": False,
+                "ready": False
+            }
+        }
+        
+        if current_calibration:
+            # Verificar se a câmera está configurada
+            if current_calibration.camera_settings:
+                status["camera"]["configured"] = True
+                status["camera"]["label"] = "Configurado"
+            
+            # Verificar se o áudio está configurado
+            if current_calibration.audio_settings:
+                status["audio"]["configured"] = True
+                status["audio"]["label"] = "Configurado"
+            
+            # Verificar se a grade está configurada
+            if current_calibration.grid_size_mm:
+                status["grid"]["configured"] = True
+                status["grid"]["label"] = "Configurado"
+            
+            # Status geral
+            all_configured = (
+                status["camera"]["configured"] and 
+                status["audio"]["configured"] and 
+                status["grid"]["configured"]
+            )
+            
+            status["overall"]["configured"] = all_configured
+            status["overall"]["ready"] = all_configured
+        
+        return {
+            "status": "success",
+            "calibration_status": status,
+            "last_updated": current_calibration.created_at.isoformat() if current_calibration else None
+        }
+        
+    except Exception as e:
+        from fastapi import status as http_status
+        raise HTTPException(
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao obter status do sistema: {str(e)}"
+        )

@@ -189,6 +189,12 @@ class CalibrationApi {
     return await this.createCalibration(calibrationData);
   }
 
+  // Novo endpoint para status do sistema no dashboard
+  async getSystemStatus() {
+    const response = await apiClient.api.get('/calibration/system-status');
+    return response.data;
+  }
+
   // Método para obter status do sistema de calibração
   async getCalibrationStatus(): Promise<{
     hasCalibration: boolean;

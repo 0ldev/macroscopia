@@ -1,7 +1,7 @@
 /**
  * Dashboard principal do sistema
  */
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Grid,
@@ -12,6 +12,7 @@ import {
   Paper,
   Avatar,
   Chip,
+  CircularProgress,
 } from '@mui/material';
 import {
   Add,
@@ -22,14 +23,81 @@ import {
   Camera,
   Mic,
   SmartToy,
+  GridOn,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout/Layout';
+import { calibrationApi } from '../services/calibrationApi';
+
+interface SystemStatus {
+  camera: {
+    configured: boolean;
+    label: string;
+  };
+  audio: {
+    configured: boolean;
+    label: string;
+  };
+  grid: {
+    configured: boolean;
+    label: string;
+  };
+  overall: {
+    configured: boolean;
+    ready: boolean;
+  };
+}
 
 const Dashboard: React.FC = () => {
   const { user, isAdmin } = useAuth();
   const navigate = useNavigate();
+  const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
+  const [statusLoading, setStatusLoading] = useState(true);
+
+  // Carregar status do sistema
+  useEffect(() => {
+    const loadSystemStatus = async () => {
+      try {
+        setStatusLoading(true);
+        const response = await calibrationApi.getSystemStatus();
+        setSystemStatus(response.calibration_status);
+      } catch (error) {
+        console.error('Erro ao carregar status do sistema:', error);
+        // Usar valores padrão em caso de erro
+        setSystemStatus({
+          camera: { configured: false, label: 'Configurar' },
+          audio: { configured: false, label: 'Configurar' },
+          grid: { configured: false, label: 'Configurar' },
+          overall: { configured: false, ready: false }
+        });
+      } finally {
+        setStatusLoading(false);
+      }
+    };
+
+    loadSystemStatus();
+  }, []);
+
+  // Adicionar listener para recarregar quando voltar para a página
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        const loadSystemStatus = async () => {
+          try {
+            const response = await calibrationApi.getSystemStatus();
+            setSystemStatus(response.calibration_status);
+          } catch (error) {
+            console.error('Erro ao recarregar status do sistema:', error);
+          }
+        };
+        loadSystemStatus();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
 
   const handleNewAnalysis = () => {
     navigate('/analysis');
@@ -45,6 +113,10 @@ const Dashboard: React.FC = () => {
 
   const handleAdmin = () => {
     navigate('/admin');
+  };
+
+  const getStatusChipColor = (configured: boolean): "success" | "warning" => {
+    return configured ? "success" : "warning";
   };
 
   return (
@@ -258,41 +330,77 @@ const Dashboard: React.FC = () => {
           <Typography variant="h6" gutterBottom>
             Status do Sistema
           </Typography>
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={4}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Camera color="primary" />
-                <Box>
-                  <Typography variant="body2" fontWeight={500}>
-                    Webcam
-                  </Typography>
-                  <Chip label="Configurar" color="warning" size="small" />
+          
+          {statusLoading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+              <CircularProgress />
+            </Box>
+          ) : (
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={4}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Camera color="primary" />
+                  <Box>
+                    <Typography variant="body2" fontWeight={500}>
+                      Webcam
+                    </Typography>
+                    <Chip 
+                      label={systemStatus?.camera.label || 'Configurar'} 
+                      color={getStatusChipColor(systemStatus?.camera.configured || false)} 
+                      size="small" 
+                    />
+                  </Box>
                 </Box>
-              </Box>
-            </Grid>
-            <Grid item xs={12} sm={4}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Mic color="primary" />
-                <Box>
-                  <Typography variant="body2" fontWeight={500}>
-                    Microfone
-                  </Typography>
-                  <Chip label="Configurar" color="warning" size="small" />
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Mic color="primary" />
+                  <Box>
+                    <Typography variant="body2" fontWeight={500}>
+                      Microfone
+                    </Typography>
+                    <Chip 
+                      label={systemStatus?.audio.label || 'Configurar'} 
+                      color={getStatusChipColor(systemStatus?.audio.configured || false)} 
+                      size="small" 
+                    />
+                  </Box>
                 </Box>
-              </Box>
-            </Grid>
-            <Grid item xs={12} sm={4}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <SmartToy color="primary" />
-                <Box>
-                  <Typography variant="body2" fontWeight={500}>
-                    IA
-                  </Typography>
-                  <Chip label="Conectada" color="success" size="small" />
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <GridOn color="primary" />
+                  <Box>
+                    <Typography variant="body2" fontWeight={500}>
+                      Grade de Referência
+                    </Typography>
+                    <Chip 
+                      label={systemStatus?.grid.label || 'Configurar'} 
+                      color={getStatusChipColor(systemStatus?.grid.configured || false)} 
+                      size="small" 
+                    />
+                  </Box>
                 </Box>
-              </Box>
+              </Grid>
             </Grid>
-          </Grid>
+          )}
+          
+          {/* Status geral do sistema */}
+          {!statusLoading && systemStatus?.overall.ready && (
+            <Box sx={{ mt: 3, p: 2, bgcolor: 'success.light', borderRadius: 2 }}>
+              <Typography variant="body2" color="success.dark" fontWeight={500}>
+                ✅ Sistema totalmente configurado e pronto para uso!
+              </Typography>
+            </Box>
+          )}
+          
+          {!statusLoading && !systemStatus?.overall.ready && (
+            <Box sx={{ mt: 3, p: 2, bgcolor: 'warning.light', borderRadius: 2 }}>
+              <Typography variant="body2" color="warning.dark" fontWeight={500}>
+                ⚠️ Configure todos os componentes para usar o sistema completo.
+              </Typography>
+            </Box>
+          )}
         </Paper>
 
         {/* Informações úteis */}
