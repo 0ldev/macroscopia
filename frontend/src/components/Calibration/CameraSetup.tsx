@@ -324,25 +324,14 @@ const CameraSetup: React.FC<CameraSetupProps> = ({
           </Card>
         </Grid>
 
-        {/* Preview da câmera */}
+        {/* Camera settings preview - Static only */}
         <Grid item xs={12}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Typography variant="h6">
-                  Preview da Câmera
+          {preview && !error && (
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  Preview de Teste da Câmera
                 </Typography>
-                <Button
-                  variant="outlined"
-                  onClick={capturePreview}
-                  disabled={selectedCamera < 0}
-                  size="small"
-                >
-                  Capturar Preview
-                </Button>
-              </Box>
-
-              {preview ? (
                 <Paper
                   elevation={2}
                   sx={{
@@ -356,30 +345,32 @@ const CameraSetup: React.FC<CameraSetupProps> = ({
                     alt="Preview da câmera"
                     style={{
                       maxWidth: '100%',
-                      maxHeight: '400px',
+                      maxHeight: '200px',
                       objectFit: 'contain',
                     }}
                   />
                 </Paper>
-              ) : (
-                <Paper
-                  elevation={1}
-                  sx={{
-                    height: 200,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    bgcolor: 'grey.100',
-                    color: 'text.secondary',
-                  }}
-                >
-                  <Typography>
-                    Clique em "Capturar Preview" para ver a imagem da câmera
-                  </Typography>
-                </Paper>
-              )}
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
+          
+          {!preview && !error && (
+            <Paper
+              elevation={1}
+              sx={{
+                height: 200,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                bgcolor: 'grey.100',
+                color: 'text.secondary',
+              }}
+            >
+              <Typography>
+                Configure as configurações da câmera e teste para ver o preview
+              </Typography>
+            </Paper>
+          )}
         </Grid>
       </Grid>
 

@@ -1,7 +1,7 @@
 /**
  * Dashboard principal do sistema
  */
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import {
   Box,
   Grid,
@@ -18,86 +18,32 @@ import {
   Add,
   History,
   Settings,
-  Assessment,
   People,
   Camera,
   Mic,
-  SmartToy,
   GridOn,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout/Layout';
-import { calibrationApi } from '../services/calibrationApi';
-
-interface SystemStatus {
-  camera: {
-    configured: boolean;
-    label: string;
-  };
-  audio: {
-    configured: boolean;
-    label: string;
-  };
-  grid: {
-    configured: boolean;
-    label: string;
-  };
-  overall: {
-    configured: boolean;
-    ready: boolean;
-  };
-}
+import { useCalibrationStatus } from '../hooks/useCalibrationStatus';
 
 const Dashboard: React.FC = () => {
   const { user, isAdmin } = useAuth();
   const navigate = useNavigate();
-  const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
-  const [statusLoading, setStatusLoading] = useState(true);
-
-  // Carregar status do sistema
-  useEffect(() => {
-    const loadSystemStatus = async () => {
-      try {
-        setStatusLoading(true);
-        const response = await calibrationApi.getSystemStatus();
-        setSystemStatus(response.calibration_status);
-      } catch (error) {
-        console.error('Erro ao carregar status do sistema:', error);
-        // Usar valores padrão em caso de erro
-        setSystemStatus({
-          camera: { configured: false, label: 'Configurar' },
-          audio: { configured: false, label: 'Configurar' },
-          grid: { configured: false, label: 'Configurar' },
-          overall: { configured: false, ready: false }
-        });
-      } finally {
-        setStatusLoading(false);
-      }
-    };
-
-    loadSystemStatus();
-  }, []);
+  const { status, loading: statusLoading, error: statusError, refreshStatus } = useCalibrationStatus();
 
   // Adicionar listener para recarregar quando voltar para a página
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        const loadSystemStatus = async () => {
-          try {
-            const response = await calibrationApi.getSystemStatus();
-            setSystemStatus(response.calibration_status);
-          } catch (error) {
-            console.error('Erro ao recarregar status do sistema:', error);
-          }
-        };
-        loadSystemStatus();
+        refreshStatus();
       }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, []);
+  }, [refreshStatus]);
 
   const handleNewAnalysis = () => {
     navigate('/analysis');
@@ -345,8 +291,8 @@ const Dashboard: React.FC = () => {
                       Webcam
                     </Typography>
                     <Chip 
-                      label={systemStatus?.camera.label || 'Configurar'} 
-                      color={getStatusChipColor(systemStatus?.camera.configured || false)} 
+                      label={status?.dashboardStatus.camera.label || 'Configurar'} 
+                      color={getStatusChipColor(status?.dashboardStatus.camera.configured || false)} 
                       size="small" 
                     />
                   </Box>
@@ -360,8 +306,8 @@ const Dashboard: React.FC = () => {
                       Microfone
                     </Typography>
                     <Chip 
-                      label={systemStatus?.audio.label || 'Configurar'} 
-                      color={getStatusChipColor(systemStatus?.audio.configured || false)} 
+                      label={status?.dashboardStatus.audio.label || 'Configurar'} 
+                      color={getStatusChipColor(status?.dashboardStatus.audio.configured || false)} 
                       size="small" 
                     />
                   </Box>
@@ -375,8 +321,8 @@ const Dashboard: React.FC = () => {
                       Grade de Referência
                     </Typography>
                     <Chip 
-                      label={systemStatus?.grid.label || 'Configurar'} 
-                      color={getStatusChipColor(systemStatus?.grid.configured || false)} 
+                      label={status?.dashboardStatus.grid.label || 'Configurar'} 
+                      color={getStatusChipColor(status?.dashboardStatus.grid.configured || false)} 
                       size="small" 
                     />
                   </Box>
@@ -386,7 +332,7 @@ const Dashboard: React.FC = () => {
           )}
           
           {/* Status geral do sistema */}
-          {!statusLoading && systemStatus?.overall.ready && (
+          {!statusLoading && status?.dashboardStatus.overall.ready && (
             <Box sx={{ mt: 3, p: 2, bgcolor: 'success.light', borderRadius: 2 }}>
               <Typography variant="body2" color="success.dark" fontWeight={500}>
                 ✅ Sistema totalmente configurado e pronto para uso!
@@ -394,10 +340,19 @@ const Dashboard: React.FC = () => {
             </Box>
           )}
           
-          {!statusLoading && !systemStatus?.overall.ready && (
+          {!statusLoading && !status?.dashboardStatus.overall.ready && (
             <Box sx={{ mt: 3, p: 2, bgcolor: 'warning.light', borderRadius: 2 }}>
               <Typography variant="body2" color="warning.dark" fontWeight={500}>
                 ⚠️ Configure todos os componentes para usar o sistema completo.
+              </Typography>
+            </Box>
+          )}
+
+          {/* Error handling */}
+          {statusError && (
+            <Box sx={{ mt: 3, p: 2, bgcolor: 'error.light', borderRadius: 2 }}>
+              <Typography variant="body2" color="error.dark" fontWeight={500}>
+                ❌ {statusError}
               </Typography>
             </Box>
           )}
