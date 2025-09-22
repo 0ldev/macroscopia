@@ -143,6 +143,61 @@ class ApiClient {
     return response.data;
   }
 
+  // Métodos de visão computacional
+  async analyzeImage(imageFile: File, gridSize: number = 5.0, useCalibration: boolean = true): Promise<any> {
+    const formData = new FormData();
+    formData.append('image_file', imageFile);
+    formData.append('grid_size_mm', gridSize.toString());
+    formData.append('use_calibration', useCalibration.toString());
+
+    const response = await this.api.post('/vision/analyze-image', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  }
+
+  async analyzeCameraImage(cameraIndex: number = 0, gridSize: number = 5.0, useCalibration: boolean = true): Promise<any> {
+    const response = await this.api.post('/vision/analyze-from-camera', {
+      camera_index: cameraIndex,
+      grid_size_mm: gridSize,
+      use_calibration: useCalibration
+    });
+    return response.data;
+  }
+
+  // Métodos de IA/OpenAI
+  async transcribeAudio(audioFile: File): Promise<any> {
+    const formData = new FormData();
+    formData.append('audio_file', audioFile);
+
+    const response = await this.api.post('/ai/transcribe-audio', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  }
+
+  async extractBiopsyData(transcriptionText: string, visionMeasurements?: any): Promise<any> {
+    const formData = new FormData();
+    formData.append('transcription_text', transcriptionText);
+    if (visionMeasurements) {
+      formData.append('vision_measurements', JSON.stringify(visionMeasurements));
+    }
+
+    const response = await this.api.post('/ai/extract-biopsy-data', formData, {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    return response.data;
+  }
+
+  async generateBiopsyReport(structuredData: any, visionMeasurements?: any, transcriptionText?: string): Promise<any> {
+    const response = await this.api.post('/ai/generate-report', {
+      structured_data: structuredData,
+      vision_measurements: visionMeasurements,
+      transcription_text: transcriptionText
+    });
+    return response.data;
+  }
+
   // Método de verificação de saúde da API
   async healthCheck(): Promise<any> {
     const response = await this.api.get('/health');

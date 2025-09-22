@@ -53,6 +53,7 @@ import {
   PhotoCamera,
 } from '@mui/icons-material';
 import SimpleCameraCapture from './SimpleCameraCapture';
+import { analysisService, VisionAnalysisResult, TranscriptionResult } from '../../services/analysisService';
 
 interface SequentialWorkflowProps {
   onComplete?: (results: AnalysisResults) => void;
@@ -97,6 +98,10 @@ const SequentialWorkflow: React.FC<SequentialWorkflowProps> = ({
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [transcriptionText, setTranscriptionText] = useState('');
   const [editedTranscription, setEditedTranscription] = useState('');
+  
+  // Measurement confirmation state
+  const [measurementsAccepted, setMeasurementsAccepted] = useState(false);
+  const [measurementError, setMeasurementError] = useState<string | null>(null);
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordingIntervalRef = useRef<NodeJS.Timeout>();
@@ -161,36 +166,78 @@ const SequentialWorkflow: React.FC<SequentialWorkflowProps> = ({
   // Step 1: Camera measurements
   const handleCameraCapture = useCallback(async (imageData: string) => {
     setLoading(true);
+    setMeasurementError(null);
+    setMeasurementsAccepted(false);
+    
     try {
-      // Simular processamento de visão computacional
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Validar imagem antes de enviar
+      const validation = analysisService.validateImageForAnalysis(imageData);
+      if (!validation.valid) {
+        const errorMsg = `Imagem inválida: ${validation.errors.join(', ')}`;
+        setMeasurementError(errorMsg);
+        updateStepCompletion(0, false, errorMsg);
+        return;
+      }
+
+      // Chamar API real de análise de visão computacional
+      const visionResult: VisionAnalysisResult = await analysisService.analyzeImage(imageData);
       
-      // Simulação de medições automáticas
-      const mockMeasurements = {
-        area_mm2: 45.2,
-        perimeter_mm: 28.7,
-        length_max_mm: 8.3,
-        width_max_mm: 6.1,
-        circularity: 0.72,
-        confidence: 0.89
-      };
+      if (!visionResult.success) {
+        const errorMsg = `Erro na análise: ${visionResult.errors.join(', ')}`;
+        setMeasurementError(errorMsg);
+        updateStepCompletion(0, false, errorMsg);
+        return;
+      }
+
+      // Verificar se as medições são confiáveis
+      if (visionResult.confidence_overall < 0.7) {
+        const errorMsg = `Confiança baixa (${Math.round(visionResult.confidence_overall * 100)}%). Tente capturar novamente com melhor iluminação e foco.`;
+        setMeasurementError(errorMsg);
+        updateStepCompletion(0, false, errorMsg);
+        return;
+      }
       
-      setResults(prev => ({ ...prev, visionMeasurements: mockMeasurements, step: 1 }));
-      updateStepCompletion(0, true);
-      setActiveStep(1);
+      // Mostrar medidas para revisão (NÃO avançar automaticamente)
+      setResults(prev => ({ 
+        ...prev, 
+        visionMeasurements: visionResult.measurements, 
+        step: 0 
+      }));
       
-      // Auto-populate measurements in transcription
-      const measurementsText = `Medições automáticas: área ${mockMeasurements.area_mm2} mm², perímetro ${mockMeasurements.perimeter_mm} mm, comprimento máximo ${mockMeasurements.length_max_mm} mm, largura máxima ${mockMeasurements.width_max_mm} mm. `;
-      setTranscriptionText(measurementsText);
-      setEditedTranscription(measurementsText);
+      // Preparar texto inicial com medidas para transcrição
+      if (visionResult.measurements) {
+        const measurementsText = `Medições automáticas obtidas: área ${visionResult.measurements.area_mm2} mm², perímetro ${visionResult.measurements.perimeter_mm} mm, comprimento máximo ${visionResult.measurements.length_max_mm} mm, largura máxima ${visionResult.measurements.width_max_mm} mm. `;
+        setTranscriptionText(measurementsText);
+        setEditedTranscription(measurementsText);
+      }
       
-    } catch (error) {
-      updateStepCompletion(0, false, 'Erro na análise de visão');
-      if (onError) onError('Erro ao processar medições da câmera');
+    } catch (error: any) {
+      console.error('Erro na captura de imagem:', error);
+      const errorMsg = error?.message || 'Erro inesperado durante o processamento da imagem';
+      setMeasurementError(errorMsg);
+      updateStepCompletion(0, false, errorMsg);
     } finally {
       setLoading(false);
     }
-  }, [updateStepCompletion, onError]);
+  }, [updateStepCompletion]);
+
+  // Accept measurements and proceed to next step
+  const acceptMeasurements = useCallback(() => {
+    setMeasurementsAccepted(true);
+    updateStepCompletion(0, true);
+    setResults(prev => ({ ...prev, step: 1 }));
+    setActiveStep(1);
+  }, [updateStepCompletion]);
+
+  // Retry measurements
+  const retryMeasurements = useCallback(() => {
+    setResults(prev => ({ ...prev, visionMeasurements: undefined }));
+    setMeasurementError(null);
+    setMeasurementsAccepted(false);
+    setTranscriptionText('');
+    setEditedTranscription('');
+    updateStepCompletion(0, false);
+  }, [updateStepCompletion]);
 
   // Step 2: Audio recording
   const startRecording = useCallback(async () => {
@@ -237,12 +284,34 @@ const SequentialWorkflow: React.FC<SequentialWorkflowProps> = ({
   const processAudioTranscription = useCallback(async (audioBlob: Blob) => {
     setLoading(true);
     try {
-      // Simular transcrição via OpenAI Whisper
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      // Validar áudio antes de enviar
+      const validation = analysisService.validateAudioForTranscription(audioBlob);
+      if (!validation.valid) {
+        updateStepCompletion(1, false, `Áudio inválido: ${validation.errors.join(', ')}`);
+        if (onError) onError('Áudio inválido para transcrição');
+        return;
+      }
+
+      // Chamar API real de transcrição
+      const transcriptionResult: TranscriptionResult = await analysisService.transcribeAudio(audioBlob);
       
-      const mockTranscription = "Amostra de biópsia de pele coletada da região dorsal. Apresenta coloração rosada uniforme, consistência firme e superfície lisa. Dimensões aproximadamente 8mm por 6mm conforme medições automáticas. Não foram observadas lesões macroscópicas evidentes. Tecido íntegro para análise histopatológica.";
+      if (!transcriptionResult.success) {
+        const errorMsg = transcriptionResult.error || 'Erro na transcrição';
+        updateStepCompletion(1, false, errorMsg);
+        if (onError) onError(errorMsg);
+        return;
+      }
       
-      const fullTranscription = transcriptionText + mockTranscription;
+      // Obter medidas dos resultados atuais
+      const currentMeasurements = results.visionMeasurements;
+      let measurementsSummary = "";
+      
+      if (currentMeasurements) {
+        measurementsSummary = `\n\n--- RESUMO DAS MEDIÇÕES AUTOMÁTICAS ---\nÁrea: ${currentMeasurements.area_mm2} mm²\nPerímetro: ${currentMeasurements.perimeter_mm} mm\nComprimento máximo: ${currentMeasurements.length_max_mm} mm\nLargura máxima: ${currentMeasurements.width_max_mm} mm\nCircularidade: ${currentMeasurements.circularity}\nConfiança da medição: ${(currentMeasurements.confidence * 100).toFixed(1)}%`;
+      }
+      
+      // Combinar a transcrição inicial, a nova transcrição e as medidas finais
+      const fullTranscription = transcriptionText + transcriptionResult.text + measurementsSummary;
       setTranscriptionText(fullTranscription);
       setEditedTranscription(fullTranscription);
       
@@ -250,19 +319,27 @@ const SequentialWorkflow: React.FC<SequentialWorkflowProps> = ({
       updateStepCompletion(1, true);
       setActiveStep(2);
       
-      // Auto-check some checklist items
+      // Auto-check some checklist items based on transcription content
+      const transcriptionLower = transcriptionResult.text.toLowerCase();
       setInformationChecklist(prev => prev.map(item => ({
         ...item,
-        checked: ['tipo_tecido', 'localizacao', 'coloracao', 'consistencia'].includes(item.id)
+        checked: item.checked || (
+          (item.id === 'tipo_tecido' && /tecido|biópsia|amostra/i.test(transcriptionResult.text)) ||
+          (item.id === 'localizacao' && /região|local|área|zona/i.test(transcriptionResult.text)) ||
+          (item.id === 'coloracao' && /cor|coloração|rosa|pálido|escuro/i.test(transcriptionResult.text)) ||
+          (item.id === 'consistencia' && /consistência|firme|mole|duro|elástico/i.test(transcriptionResult.text))
+        )
       })));
       
-    } catch (error) {
-      updateStepCompletion(1, false, 'Erro na transcrição');
+    } catch (error: any) {
+      console.error('Erro na transcrição:', error);
+      const errorMsg = error?.message || 'Erro na transcrição';
+      updateStepCompletion(1, false, errorMsg);
       if (onError) onError('Erro ao processar transcrição de áudio');
     } finally {
       setLoading(false);
     }
-  }, [transcriptionText, updateStepCompletion, onError]);
+  }, [transcriptionText, results.visionMeasurements, updateStepCompletion, onError]);
 
   // Step 3: Review transcription
   const completeReview = useCallback(() => {
@@ -284,49 +361,72 @@ const SequentialWorkflow: React.FC<SequentialWorkflowProps> = ({
   const generateStructuredForm = useCallback(async () => {
     setLoading(true);
     try {
-      // Simular processamento via 8 funções estruturadas
-      await new Promise(resolve => setTimeout(resolve, 4000));
+      // Chamar API real para extrair dados estruturados
+      const extractionResult = await analysisService.extractBiopsyData(
+        editedTranscription,
+        results.visionMeasurements
+      );
       
-      const mockStructuredData = {
+      if (!extractionResult.success) {
+        const errorMsg = extractionResult.error || 'Erro na extração de dados';
+        updateStepCompletion(3, false, errorMsg);
+        if (onError) onError(errorMsg);
+        return;
+      }
+      
+      // Usar dados extraídos pela IA ou fallback para estrutura mínima
+      const structuredData = extractionResult.paciente || extractionResult.biópsia || 
+        extractionResult.análise_macroscópica || {
         biópsia: {
-          tipo_tecido: "Pele",
-          local_coleta: "Região dorsal",
+          tipo_tecido: "Não especificado",
+          local_coleta: "Não especificado",
           data_coleta: new Date().toISOString().split('T')[0]
         },
         análise_macroscópica: {
-          cor: "Rosada",
-          consistencia: "Firme",
-          superfície: "Lisa",
-          aspecto_geral: "Íntegro"
+          descrição: editedTranscription.substring(0, 500) + "..."
         },
         medições: results.visionMeasurements,
-        observações: {
-          achados_relevantes: ["Ausência de lesões macroscópicas"]
-        }
+        qualidade_extração: extractionResult.qualidade_extração,
+        tokens_usados: extractionResult.tokens_used
       };
       
-      setResults(prev => ({ ...prev, structuredData: mockStructuredData, step: 4 }));
+      setResults(prev => ({ ...prev, structuredData, step: 4 }));
       updateStepCompletion(3, true);
       setActiveStep(4);
       
-    } catch (error) {
-      updateStepCompletion(3, false, 'Erro na geração do formulário');
-      if (onError) onError('Erro ao gerar formulário estruturado');
+    } catch (error: any) {
+      console.error('Erro na geração do formulário:', error);
+      const errorMsg = error?.message || 'Erro na geração do formulário';
+      updateStepCompletion(3, false, errorMsg);
+      if (onError) onError(errorMsg);
     } finally {
       setLoading(false);
     }
-  }, [results.visionMeasurements, updateStepCompletion, onError]);
+  }, [editedTranscription, results.visionMeasurements, updateStepCompletion, onError]);
 
   // Step 5: Save to database
   const saveToDatabase = useCallback(async () => {
     setLoading(true);
     try {
-      // Simular salvamento no banco
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Gerar relatório final usando IA
+      const reportResult = await analysisService.generateBiopsyReport(
+        results.structuredData,
+        results.visionMeasurements,
+        editedTranscription
+      );
+      
+      if (!reportResult.success) {
+        const errorMsg = reportResult.error || 'Erro na geração do relatório';
+        updateStepCompletion(4, false, errorMsg);
+        if (onError) onError(errorMsg);
+        return;
+      }
       
       const finalResults = {
         ...results,
-        finalReport: `Relatório de análise completo - ${new Date().toLocaleString()}`,
+        finalReport: reportResult.report_text || `Relatório de análise completo - ${new Date().toLocaleString()}`,
+        reportMetadata: reportResult.metadata,
+        tokensUsed: reportResult.tokens_used,
         step: 5
       };
       
@@ -335,13 +435,15 @@ const SequentialWorkflow: React.FC<SequentialWorkflowProps> = ({
       
       if (onComplete) onComplete(finalResults);
       
-    } catch (error) {
-      updateStepCompletion(4, false, 'Erro ao salvar no banco');
+    } catch (error: any) {
+      console.error('Erro ao salvar:', error);
+      const errorMsg = error?.message || 'Erro ao salvar no banco';
+      updateStepCompletion(4, false, errorMsg);
       if (onError) onError('Erro ao salvar análise no banco de dados');
     } finally {
       setLoading(false);
     }
-  }, [results, updateStepCompletion, onComplete, onError]);
+  }, [results, editedTranscription, updateStepCompletion, onComplete, onError]);
 
   const handleChecklistChange = (id: string, checked: boolean) => {
     setInformationChecklist(prev => prev.map(item =>
@@ -396,38 +498,118 @@ const SequentialWorkflow: React.FC<SequentialWorkflowProps> = ({
                   height={480}
                 />
                 
-                {results.visionMeasurements && (
+                {/* Exibição de Erro */}
+                {measurementError && (
                   <Box sx={{ mt: 2 }}>
-                    <Alert severity="success">
-                      ✅ Medições automáticas concluídas!
+                    <Alert severity="error" sx={{ mb: 2 }}>
+                      <Typography variant="body2">
+                        <strong>❌ Erro na Medição:</strong> {measurementError}
+                      </Typography>
                     </Alert>
-                    <Grid container spacing={2} sx={{ mt: 1 }}>
-                      <Grid item xs={6}>
-                        <Typography variant="body2">
-                          <strong>Área:</strong> {results.visionMeasurements.area_mm2} mm²
-                        </Typography>
+                    <Paper sx={{ p: 2, backgroundColor: 'error.light' }}>
+                      <Typography variant="h6" gutterBottom color="error">
+                        🔄 Medição Não Realizada
+                      </Typography>
+                      <Typography variant="body2" sx={{ mb: 2 }}>
+                        O sistema não conseguiu extrair medidas precisas da imagem. 
+                        Isso pode ocorrer devido a problemas de iluminação, foco, ou posicionamento da amostra.
+                      </Typography>
+                      <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                        <Button
+                          variant="contained"
+                          color="primary"
+                          onClick={retryMeasurements}
+                          startIcon={<Refresh />}
+                        >
+                          Capturar Nova Imagem
+                        </Button>
+                        <Button
+                          variant="outlined"
+                          color="warning"
+                          onClick={acceptMeasurements}
+                        >
+                          Prosseguir sem Medidas
+                        </Button>
+                      </Box>
+                    </Paper>
+                  </Box>
+                )}
+
+                {/* Exibição de Medidas Bem-sucedidas */}
+                {results.visionMeasurements && !measurementError && (
+                  <Box sx={{ mt: 2 }}>
+                    <Alert severity="success" sx={{ mb: 2 }}>
+                      ✅ Medições automáticas concluídas com {(results.visionMeasurements.confidence * 100).toFixed(1)}% de confiança!
+                    </Alert>
+                    <Paper sx={{ p: 2, backgroundColor: 'success.light' }}>
+                      <Typography variant="h6" gutterBottom>
+                        📏 Resultados das Medições
+                      </Typography>
+                      <Grid container spacing={2}>
+                        <Grid item xs={6} md={3}>
+                          <Typography variant="body2">
+                            <strong>Área:</strong> {results.visionMeasurements.area_mm2} mm²
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6} md={3}>
+                          <Typography variant="body2">
+                            <strong>Perímetro:</strong> {results.visionMeasurements.perimeter_mm} mm
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6} md={3}>
+                          <Typography variant="body2">
+                            <strong>Comprimento:</strong> {results.visionMeasurements.length_max_mm} mm
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6} md={3}>
+                          <Typography variant="body2">
+                            <strong>Largura:</strong> {results.visionMeasurements.width_max_mm} mm
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6} md={3}>
+                          <Typography variant="body2">
+                            <strong>Circularidade:</strong> {results.visionMeasurements.circularity}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6} md={3}>
+                          <Typography variant="body2">
+                            <strong>Confiança:</strong> {(results.visionMeasurements.confidence * 100).toFixed(1)}%
+                          </Typography>
+                        </Grid>
                       </Grid>
-                      <Grid item xs={6}>
+                      
+                      {/* Botões de Decisão */}
+                      <Box sx={{ mt: 3, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                        <Button
+                          variant="contained"
+                          color="success"
+                          onClick={acceptMeasurements}
+                          startIcon={<CheckCircle />}
+                          size="large"
+                        >
+                          ✅ Aceitar Medidas e Prosseguir
+                        </Button>
+                        <Button
+                          variant="outlined"
+                          color="primary"
+                          onClick={retryMeasurements}
+                          startIcon={<Refresh />}
+                        >
+                          🔄 Medir Novamente
+                        </Button>
+                      </Box>
+
+                      <Alert severity="info" sx={{ mt: 2 }}>
                         <Typography variant="body2">
-                          <strong>Perímetro:</strong> {results.visionMeasurements.perimeter_mm} mm
+                          <strong>Revisão necessária:</strong> Confirme se as medidas estão adequadas antes de prosseguir. 
+                          As medidas aceitas serão incluídas automaticamente na transcrição.
                         </Typography>
-                      </Grid>
-                    </Grid>
+                      </Alert>
+                    </Paper>
                   </Box>
                 )}
               </CardContent>
             </Card>
-            
-            <Box sx={{ mb: 1 }}>
-              <Button
-                variant="outlined"
-                onClick={() => setActiveStep(1)}
-                disabled={!steps[0].completed}
-                sx={{ mt: 1, mr: 1 }}
-              >
-                Pular (Opcional)
-              </Button>
-            </Box>
           </StepContent>
         </Step>
 
@@ -444,6 +626,42 @@ const SequentialWorkflow: React.FC<SequentialWorkflowProps> = ({
               {steps[1].description}
             </Typography>
             
+            {/* Checklist Compacto - Acima do Microfone */}
+            <Paper sx={{ p: 2, mb: 2, backgroundColor: 'grey.50' }}>
+              <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold' }}>
+                📋 Itens a abordar no relatório oral:
+              </Typography>
+              <Grid container spacing={1}>
+                {informationChecklist.map((item) => (
+                  <Grid item xs={6} md={3} key={item.id}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', py: 0.25 }}>
+                      <Checkbox
+                        checked={item.checked}
+                        onChange={(e) => handleChecklistChange(item.id, e.target.checked)}
+                        size="small"
+                        color="primary"
+                        sx={{ p: 0.5 }}
+                      />
+                      <Typography variant="body2" sx={{ fontSize: '0.85rem', lineHeight: 1.2 }}>
+                        {item.label}
+                        {item.required && (
+                          <Chip 
+                            label="*" 
+                            size="small" 
+                            color={item.checked ? "success" : "warning"}
+                            sx={{ ml: 0.5, height: 16, fontSize: '0.7rem' }}
+                          />
+                        )}
+                      </Typography>
+                    </Box>
+                  </Grid>
+                ))}
+              </Grid>
+              <Typography variant="caption" color="textSecondary" sx={{ mt: 1, display: 'block' }}>
+                * = Obrigatório | Marque os itens conforme você os menciona durante a gravação
+              </Typography>
+            </Paper>
+
             <Card sx={{ mb: 2 }}>
               <CardContent>
                 <Box sx={{ textAlign: 'center', mb: 2 }}>
@@ -489,7 +707,7 @@ const SequentialWorkflow: React.FC<SequentialWorkflowProps> = ({
                 </Box>
                 
                 {transcriptionText && (
-                  <Paper sx={{ p: 2, backgroundColor: 'info.light' }}>
+                  <Paper sx={{ p: 2, backgroundColor: 'info.light', mb: 2 }}>
                     <Typography variant="subtitle2" gutterBottom>
                       📝 Transcrição Automática:
                     </Typography>
@@ -528,58 +746,36 @@ const SequentialWorkflow: React.FC<SequentialWorkflowProps> = ({
             </Typography>
             
             <Grid container spacing={2}>
-              <Grid item xs={12} md={6}>
+              <Grid item xs={12}>
                 <Card>
                   <CardContent>
                     <Typography variant="h6" gutterBottom>
-                      ✏️ Editar Transcrição
-                    </Typography>
-                    <TextField
-                      multiline
-                      rows={8}
-                      fullWidth
-                      value={editedTranscription}
-                      onChange={(e) => setEditedTranscription(e.target.value)}
-                      placeholder="Edite a transcrição conforme necessário..."
-                    />
-                  </CardContent>
-                </Card>
-              </Grid>
-              
-              <Grid item xs={12} md={6}>
-                <Card>
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom>
-                      📋 Lista de Verificação
+                      ✏️ Editar Transcrição do ChatGPT
                     </Typography>
                     <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-                      Verifique se todas as informações essenciais estão presentes:
+                      Revise e edite a transcrição gerada automaticamente pela IA. 
+                      Esta transcrição inclui as medições automáticas e sua descrição oral.
                     </Typography>
                     
-                    <List dense>
-                      {informationChecklist.map((item) => (
-                        <ListItem key={item.id} sx={{ py: 0.5 }}>
-                          <ListItemIcon sx={{ minWidth: 36 }}>
-                            <Checkbox
-                              checked={item.checked}
-                              onChange={(e) => handleChecklistChange(item.id, e.target.checked)}
-                              color="primary"
-                            />
-                          </ListItemIcon>
-                          <ListItemText 
-                            primary={item.label}
-                            secondary={item.required ? "Obrigatório" : "Opcional"}
-                          />
-                          {item.required && (
-                            <Chip 
-                              label="Obrigatório" 
-                              size="small" 
-                              color={item.checked ? "success" : "warning"}
-                            />
-                          )}
-                        </ListItem>
-                      ))}
-                    </List>
+                    {transcriptionText && (
+                      <Alert severity="info" sx={{ mb: 2 }}>
+                        <Typography variant="body2">
+                          <strong>Transcrição Original do ChatGPT:</strong> A IA processou sua gravação e gerou automaticamente este texto.
+                        </Typography>
+                      </Alert>
+                    )}
+                    
+                    <TextField
+                      fullWidth
+                      multiline
+                      rows={8}
+                      variant="outlined"
+                      label="Transcrição do ChatGPT para edição"
+                      value={editedTranscription}
+                      onChange={(e) => setEditedTranscription(e.target.value)}
+                      placeholder="A transcrição do ChatGPT aparecerá aqui para edição..."
+                      helperText="Edite conforme necessário antes de prosseguir para a geração do formulário estruturado"
+                    />
                   </CardContent>
                 </Card>
               </Grid>
