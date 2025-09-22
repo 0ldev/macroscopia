@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     # OpenAI Configuration
     openai_api_key: Optional[str] = None
     openai_prompt_id: Optional[str] = None  # Prompt ID configured in OpenAI platform
+    # Local AI prompt/function file references (used by launcher/.env)
+    ai_prompt_file: str = "./prompt.md"
+    ai_functions_file: str = "./functions.md"
     
     # Upload
     upload_max_size: int = 10485760  # 10MB
@@ -43,6 +46,8 @@ class Settings(BaseSettings):
         # Prefer project root .env; fallback to config/.env if exists
         env_file = ".env"
         case_sensitive = False
+        # Ignore extra environment variables instead of raising validation errors
+        extra = "ignore"
 
 
 # Instância global das configurações

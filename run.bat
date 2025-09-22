@@ -2,22 +2,7 @@
 setlocal enabledelayedexpansion
 
 REM Script para executar Sistema de Macroscopia diretamente do código fonte - Windows
-REM ========REM Instalar dependências do backend
-if exist "backend\requirements.txt" (
-    echo %GREEN%[INFO]%NC% Instalando dependências do backend...
-    pip install -r backend\requirements.txt
-    if !errorlevel! neq 0 (
-        echo %YELLOW%[WARN]%NC% Algumas dependências podem ter falhado. Tentando dependências básicas...
-        pip install fastapi uvicorn sqlalchemy pydantic pydantic-settings
-    )
-) else (
-    echo %YELLOW%[WARN]%NC% Arquivo requirements.txt não encontrado. Instalando dependências básicas...
-    pip install fastapi uvicorn sqlalchemy pydantic pydantic-settings python-multipart
-)
-
-REM Verificar e instalar dependências essenciais conhecidas
-echo %GREEN%[INFO]%NC% Instalando dependências essenciais conhecidas...
-pip install databases aiosqlite python-jose[cryptography] bcrypt passlib[bcrypt] websockets aiofiles scipy scikit-image matplotlib openai psutil python-magic requests opencv-python pillow numpy=================================
+REM =========================================================================
 
 REM Configurar codepage para UTF-8
 chcp 65001 >nul 2>&1
@@ -134,41 +119,62 @@ if not exist "!VENV_PATH!" (
         pause
         exit /b 1
     )
+    
+    REM Aguardar a criação completa
+    timeout /t 2 /nobreak >nul 2>&1
 )
 
-REM Ativar ambiente virtual
-echo %GREEN%[INFO]%NC% Ativando ambiente virtual...
-if exist "!VENV_PATH!\Scripts\activate.bat" (
-    call "!VENV_PATH!\Scripts\activate.bat"
-) else (
-    echo %RED%[ERROR]%NC% Não foi possível encontrar script de ativação do venv
+REM Verificar se o Python do ambiente virtual existe
+set "VENV_PYTHON=!VENV_PATH!\Scripts\python.exe"
+set "VENV_PIP=!VENV_PATH!\Scripts\pip.exe"
+
+if not exist "!VENV_PYTHON!" (
+    echo %RED%[ERROR]%NC% Python não encontrado no ambiente virtual
+    echo          Tentando recriar o ambiente virtual...
+    rmdir /s /q "!VENV_PATH!" 2>nul
+    !PYTHON_CMD! -m venv !VENV_PATH!
+    if !errorlevel! neq 0 (
+        echo %RED%[ERROR]%NC% Falha ao recriar ambiente virtual
+        pause
+        exit /b 1
+    )
+    timeout /t 2 /nobreak >nul 2>&1
+)
+
+REM Usar Python diretamente do venv em vez de ativação
+echo %GREEN%[INFO]%NC% Configurando ambiente virtual...
+"!VENV_PYTHON!" --version >nul 2>&1
+if !errorlevel! neq 0 (
+    echo %RED%[ERROR]%NC% Ambiente virtual corrompido
     pause
     exit /b 1
 )
 
-REM Verificar se pip está disponível
-pip --version >nul 2>&1
+echo %GREEN%[INFO]%NC% Ambiente virtual configurado com sucesso
+
+REM Verificar se pip está disponível no venv
+"!VENV_PIP!" --version >nul 2>&1
 if !errorlevel! neq 0 (
     echo %RED%[ERROR]%NC% pip não encontrado no ambiente virtual
     pause
     exit /b 1
 )
 
-REM Atualizar pip
+REM Atualizar pip no ambiente virtual
 echo %GREEN%[INFO]%NC% Atualizando pip...
-pip install --upgrade pip setuptools wheel
+"!VENV_PIP!" install --upgrade pip setuptools wheel
 
 REM Verificar se requirements.txt existe
 if exist "backend\requirements.txt" (
     echo %GREEN%[INFO]%NC% Instalando dependências do backend...
-    pip install -r backend\requirements.txt
+    "!VENV_PIP!" install -r backend\requirements.txt
     if !errorlevel! neq 0 (
         echo %YELLOW%[WARN]%NC% Algumas dependências podem ter falhado. Tentando dependências básicas...
-        pip install fastapi uvicorn sqlalchemy pydantic pydantic-settings
+        "!VENV_PIP!" install fastapi uvicorn sqlalchemy pydantic pydantic-settings
     )
 ) else (
     echo %YELLOW%[WARN]%NC% Arquivo requirements.txt não encontrado. Instalando dependências básicas...
-    pip install fastapi uvicorn sqlalchemy pydantic pydantic-settings python-multipart
+    "!VENV_PIP!" install fastapi uvicorn sqlalchemy pydantic pydantic-settings python-multipart
 )
 
 REM Verificar dependências críticas
@@ -176,11 +182,11 @@ echo %GREEN%[INFO]%NC% Verificando dependências críticas...
 
 REM Instalar dependências essenciais
 echo %GREEN%[INFO]%NC% Instalando dependências essenciais...
-pip install requests opencv-python pillow numpy
+"!VENV_PIP!" install requests opencv-python pillow numpy
 
 REM PyAudio (opcional, pode falhar no Windows)
 echo %GREEN%[INFO]%NC% Tentando instalar PyAudio ^(opcional^)...
-pip install pyaudio >nul 2>&1
+"!VENV_PIP!" install pyaudio >nul 2>&1
 if !errorlevel! neq 0 (
     echo %YELLOW%[WARN]%NC% PyAudio falhou na instalação. Recursos de áudio podem não funcionar.
     echo %YELLOW%[WARN]%NC% Para instalar PyAudio no Windows, baixe o wheel em:
@@ -306,11 +312,8 @@ echo %GREEN%[INFO]%NC% Iniciando aplicação...
 echo.
 
 REM Executar o launcher com o Python correto do venv
-if exist "venv\Scripts\python.exe" (
-    venv\Scripts\python.exe launcher.py
-) else (
-    !PYTHON_CMD! launcher.py
-)
+echo %GREEN%[INFO]%NC% Executando com Python do ambiente virtual...
+"!VENV_PYTHON!" launcher.py
 
 REM Se chegou aqui, o programa terminou
 echo.
