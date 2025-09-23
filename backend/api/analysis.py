@@ -159,12 +159,66 @@ async def list_user_analyses(
         analyses = []
         for log in logs:
             if log.action == "save_analysis":
-                analyses.append({
-                    "id": f"analysis_{log.user_id}_{log.timestamp.strftime('%Y%m%d_%H%M%S')}",
-                    "timestamp": log.timestamp.isoformat(),
-                    "details": log.details,
-                    "log_id": log.id
-                })
+                # Extract the complete analysis data from log details
+                import json
+                import re
+
+                # Parse the JSON data from the log details
+                try:
+                    # Extract JSON from the log details (after "Dados: ")
+                    match = re.search(r'Dados: ({.*?})\.\.\.', log.details)
+                    if match:
+                        complete_data = json.loads(match.group(1))
+
+                        # Convert to frontend Analysis format
+                        analysis_id = f"analysis_{log.user_id}_{log.timestamp.strftime('%Y%m%d_%H%M%S')}"
+
+                        analysis = {
+                            "id": analysis_id,
+                            "user_id": log.user_id,
+                            "sample_id": complete_data.get('formData', {}).get('numero_peca', f"sample_{log.id}"),
+                            "image_path": None,  # Could be extracted from visionMeasurements if needed
+                            "measurements": complete_data.get('visionMeasurements'),
+                            "transcription": complete_data.get('transcription'),
+                            "form_data": complete_data.get('formData'),
+                            "report": None,  # Could be generated if needed
+                            "created_at": log.timestamp.isoformat(),
+                            "updated_at": log.timestamp.isoformat()
+                        }
+                        analyses.append(analysis)
+                    else:
+                        # Fallback for logs without complete data
+                        analysis_id = f"analysis_{log.user_id}_{log.timestamp.strftime('%Y%m%d_%H%M%S')}"
+                        analysis = {
+                            "id": analysis_id,
+                            "user_id": log.user_id,
+                            "sample_id": f"sample_{log.id}",
+                            "image_path": None,
+                            "measurements": None,
+                            "transcription": None,
+                            "form_data": None,
+                            "report": None,
+                            "created_at": log.timestamp.isoformat(),
+                            "updated_at": log.timestamp.isoformat()
+                        }
+                        analyses.append(analysis)
+
+                except (json.JSONDecodeError, AttributeError) as e:
+                    # Fallback for corrupted or old format logs
+                    analysis_id = f"analysis_{log.user_id}_{log.timestamp.strftime('%Y%m%d_%H%M%S')}"
+                    analysis = {
+                        "id": analysis_id,
+                        "user_id": log.user_id,
+                        "sample_id": f"sample_{log.id}",
+                        "image_path": None,
+                        "measurements": None,
+                        "transcription": None,
+                        "form_data": None,
+                        "report": None,
+                        "created_at": log.timestamp.isoformat(),
+                        "updated_at": log.timestamp.isoformat()
+                    }
+                    analyses.append(analysis)
 
         return {
             "analyses": analyses,

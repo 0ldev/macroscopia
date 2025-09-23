@@ -122,10 +122,10 @@ class ApiClient {
 
   // Métodos de análise (a serem implementados nas próximas fases)
   async getAnalyses(skip: number = 0, limit: number = 100): Promise<Analysis[]> {
-    const response: AxiosResponse<Analysis[]> = await this.api.get('/analyses', {
+    const response: AxiosResponse<{analyses: Analysis[], total: number, skip: number, limit: number}> = await this.api.get('/api/analysis/list', {
       params: { skip, limit }
     });
-    return response.data;
+    return response.data.analyses;
   }
 
   async createAnalysis(analysis: AnalysisCreate): Promise<Analysis> {
