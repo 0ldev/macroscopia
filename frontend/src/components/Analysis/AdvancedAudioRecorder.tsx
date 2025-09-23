@@ -315,7 +315,7 @@ const AdvancedAudioRecorder: React.FC<AdvancedAudioRecorderProps> = ({
       
       // Chamar API de streaming transcription
       const token = localStorage.getItem('access_token');
-      const response = await fetch('/api/ai/transcribe-audio-streaming', {
+      const response = await fetch('/ai/transcribe-audio-streaming', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`

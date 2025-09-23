@@ -217,19 +217,11 @@ const SequentialWorkflow: React.FC<SequentialWorkflowProps> = ({
 
   // Step 3: Review transcription
   const completeReview = useCallback(() => {
-    const requiredItemsCompleted = informationChecklist
-      .filter(item => item.required)
-      .every(item => item.checked);
-    
-    if (!requiredItemsCompleted) {
-      if (onError) onError('Complete todos os itens obrigatórios da lista de verificação');
-      return;
-    }
-    
+    // Remover validação de checklist - agora é apenas referência
     setResults(prev => ({ ...prev, step: 3 }));
     updateStepCompletion(2, true);
     setActiveStep(3);
-  }, [informationChecklist, updateStepCompletion, onError]);
+  }, [updateStepCompletion]);
 
   // Step 4: Generate structured form
   const generateStructuredForm = useCallback(async () => {
@@ -528,30 +520,36 @@ const SequentialWorkflow: React.FC<SequentialWorkflowProps> = ({
               {steps[1].description}
             </Typography>
             
-            {/* Checklist Compacto - Acima do Microfone */}
-            <Paper sx={{ p: 2, mb: 2, backgroundColor: 'grey.50' }}>
-              <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold' }}>
-                📋 Itens a abordar no relatório oral:
+            {/* Lista de Referência - Apenas para Orientação */}
+            <Paper sx={{ p: 2, mb: 2, backgroundColor: 'info.light', border: '1px solid', borderColor: 'info.main' }}>
+              <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold', color: 'info.dark' }}>
+                📋 Itens de referência para o relatório oral:
+              </Typography>
+              <Typography variant="body2" color="textSecondary" sx={{ mb: 2, fontStyle: 'italic' }}>
+                📝 Use esta lista como guia durante sua gravação. Não é necessário marcar itens.
               </Typography>
               <Grid container spacing={1}>
                 {informationChecklist.map((item) => (
                   <Grid item xs={6} md={3} key={item.id}>
                     <Box sx={{ display: 'flex', alignItems: 'center', py: 0.25 }}>
-                      <Checkbox
-                        checked={item.checked}
-                        onChange={(e) => handleChecklistChange(item.id, e.target.checked)}
-                        size="small"
-                        color="primary"
-                        sx={{ p: 0.5 }}
+                      <Box
+                        sx={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: '50%',
+                          backgroundColor: item.required ? 'warning.main' : 'info.main',
+                          mr: 1,
+                          flexShrink: 0
+                        }}
                       />
                       <Typography variant="body2" sx={{ fontSize: '0.85rem', lineHeight: 1.2 }}>
                         {item.label}
                         {item.required && (
-                          <Chip 
-                            label="*" 
-                            size="small" 
-                            color={item.checked ? "success" : "warning"}
-                            sx={{ ml: 0.5, height: 16, fontSize: '0.7rem' }}
+                          <Chip
+                            label="Importante"
+                            size="small"
+                            color="warning"
+                            sx={{ ml: 0.5, height: 16, fontSize: '0.6rem' }}
                           />
                         )}
                       </Typography>
@@ -560,7 +558,7 @@ const SequentialWorkflow: React.FC<SequentialWorkflowProps> = ({
                 ))}
               </Grid>
               <Typography variant="caption" color="textSecondary" sx={{ mt: 1, display: 'block' }}>
-                * = Obrigatório | Marque os itens conforme você os menciona durante a gravação
+                ⚠️ Itens marcados como "Importante" são fundamentais para um relatório completo
               </Typography>
             </Paper>
 

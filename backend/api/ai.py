@@ -61,6 +61,12 @@ async def transcribe_audio(
             audio_format = 'wav'
         elif audio_format == 'ogg':
             audio_format = 'ogg'
+        elif audio_format == 'webm':
+            audio_format = 'webm'  # OpenAI Whisper suporta webm
+        elif audio_format == 'm4a':
+            audio_format = 'm4a'
+        elif audio_format == 'flac':
+            audio_format = 'flac'
         else:
             audio_format = 'wav'  # fallback
         
@@ -132,6 +138,12 @@ async def transcribe_audio_streaming(
             audio_format = 'wav'
         elif audio_format == 'ogg':
             audio_format = 'ogg'
+        elif audio_format == 'webm':
+            audio_format = 'webm'  # OpenAI Whisper suporta webm
+        elif audio_format == 'm4a':
+            audio_format = 'm4a'
+        elif audio_format == 'flac':
+            audio_format = 'flac'
         else:
             audio_format = 'wav'  # fallback
         
@@ -775,7 +787,7 @@ async def get_ai_capabilities():
     return {
         "whisper": {
             "available": True,
-            "supported_formats": ["mp3", "wav", "ogg", "m4a", "flac"],
+            "supported_formats": ["mp3", "wav", "ogg", "webm", "m4a", "flac"],
             "max_file_size": "25MB",
             "languages": ["pt", "en", "es", "auto"],
             "model": "whisper-1"

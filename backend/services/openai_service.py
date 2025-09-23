@@ -51,7 +51,7 @@ class OpenAIService:
                 # Transcrever usando o novo modelo com melhor qualidade
                 with open(temp_file.name, "rb") as audio_file:
                     transcript = service.client.audio.transcriptions.create(
-                        model="gpt-4o-mini-transcribe",  # Upgrade do whisper-1
+                        model="whisper-1",  # Modelo correto do Whisper
                         file=audio_file,
                         language="pt",  # Português
                         response_format="verbose_json"
@@ -102,30 +102,26 @@ class OpenAIService:
                 temp_file.write(audio_data)
                 temp_file.flush()
                 
-                # Transcrever usando streaming
+                # Transcrever usando Whisper (não suporta streaming real)
                 with open(temp_file.name, "rb") as audio_file:
-                    stream = service.client.audio.transcriptions.create(
-                        model="gpt-4o-mini-transcribe",
+                    transcript = service.client.audio.transcriptions.create(
+                        model="whisper-1",
                         file=audio_file,
                         language="pt",  # Português
-                        response_format="text",
-                        stream=True
+                        response_format="text"
                     )
-                    
-                    # Processar stream de eventos
-                    full_text = ""
-                    for event in stream:
-                        if hasattr(event, 'text'):
-                            chunk_text = event.text
-                            full_text += chunk_text
-                            
-                            yield {
-                                "type": "transcript.text.delta",
-                                "delta": chunk_text,
-                                "full_text": full_text,
-                                "timestamp": time.time()
-                            }
-                    
+
+                    # Simular streaming enviando o resultado completo
+                    full_text = transcript
+
+                    # Enviar resultado como delta único para compatibilidade
+                    yield {
+                        "type": "transcript.text.delta",
+                        "delta": full_text,
+                        "full_text": full_text,
+                        "timestamp": time.time()
+                    }
+
                     # Evento final
                     yield {
                         "type": "transcript.text.done",
