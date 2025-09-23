@@ -24,12 +24,19 @@ import {
   Chip,
   Grid,
   CircularProgress,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  FormControlLabel,
+  Tabs,
+  Tab,
 } from '@mui/material';
 import {
   AutoAwesome,
   Save,
   CheckCircle,
-  Error,
+  Error as ErrorIcon,
   Refresh,
   ExpandMore,
 } from '@mui/icons-material';
@@ -48,6 +55,8 @@ interface AnalysisResults {
   audioTranscription?: string;
   structuredData?: any;
   finalReport?: string;
+  formData?: MacroscopiaFormData;
+  savedId?: string;
   step: number;
 }
 
@@ -67,6 +76,55 @@ interface InformationChecklist {
   required: boolean;
 }
 
+interface MacroscopiaFormData {
+  // preencher_identificacao
+  numero_peca: string;
+  tipo_tecido: string;
+  localizacao: string;
+  procedencia: string;
+
+  // preencher_coloracao
+  cor_predominante: string;
+  cor_secundaria: string;
+  distribuicao: string;
+  observacoes_cor: string;
+
+  // preencher_consistencia
+  consistencia_principal: string;
+  homogeneidade: string;
+  areas_diferentes: string;
+
+  // preencher_superficie
+  aspecto_superficie: string;
+  brilho: string;
+  presenca_secrecao: boolean;
+  tipo_secrecao: string;
+
+  // identificar_lesoes
+  presenca_lesoes: boolean;
+  tipo_lesao: string[];
+  localizacao_lesao: string;
+  tamanho_aproximado: string;
+  caracteristicas_lesao: string;
+
+  // avaliar_inflamacao
+  intensidade_inflamacao: string;
+  sinais_presentes: string[];
+  distribuicao_inflamacao: string;
+
+  // registrar_observacoes
+  observacoes_gerais: string;
+  particularidades: string;
+  correlacao_clinica: string;
+  recomendacoes: string;
+
+  // gerar_conclusao
+  impressao_diagnostica: string;
+  achados_principais: string[];
+  necessidade_microscopia: boolean;
+  observacoes_finais: string;
+}
+
 const SequentialWorkflow: React.FC<SequentialWorkflowProps> = ({
   onComplete,
   onError
@@ -78,9 +136,64 @@ const SequentialWorkflow: React.FC<SequentialWorkflowProps> = ({
   // Transcription state
   const [transcriptionText, setTranscriptionText] = useState('');
   const [editedTranscription, setEditedTranscription] = useState('');
-  
+
   // Measurement confirmation state
   const [measurementError, setMeasurementError] = useState<string | null>(null);
+
+  // Form data state
+  // Animation and visual feedback states
+  const [animatingField, setAnimatingField] = useState<string | null>(null);
+
+  const [formData, setFormData] = useState<MacroscopiaFormData>({
+    // preencher_identificacao
+    numero_peca: '',
+    tipo_tecido: '',
+    localizacao: '',
+    procedencia: '',
+
+    // preencher_coloracao
+    cor_predominante: '',
+    cor_secundaria: '',
+    distribuicao: '',
+    observacoes_cor: '',
+
+    // preencher_consistencia
+    consistencia_principal: '',
+    homogeneidade: '',
+    areas_diferentes: '',
+
+    // preencher_superficie
+    aspecto_superficie: '',
+    brilho: '',
+    presenca_secrecao: false,
+    tipo_secrecao: '',
+
+    // identificar_lesoes
+    presenca_lesoes: false,
+    tipo_lesao: [],
+    localizacao_lesao: '',
+    tamanho_aproximado: '',
+    caracteristicas_lesao: '',
+
+    // avaliar_inflamacao
+    intensidade_inflamacao: '',
+    sinais_presentes: [],
+    distribuicao_inflamacao: '',
+
+    // registrar_observacoes
+    observacoes_gerais: '',
+    particularidades: '',
+    correlacao_clinica: '',
+    recomendacoes: '',
+
+    // gerar_conclusao
+    impressao_diagnostica: '',
+    achados_principais: [],
+    necessidade_microscopia: false,
+    observacoes_finais: ''
+  });
+
+  const [formGenerated, setFormGenerated] = useState(false);
   
   // Step definitions
   const [steps, setSteps] = useState<WorkflowStep[]>([
@@ -122,7 +235,7 @@ const SequentialWorkflow: React.FC<SequentialWorkflowProps> = ({
   ]);
   
   // Information checklist for step 2
-  const [informationChecklist, setInformationChecklist] = useState<InformationChecklist[]>([
+  const [informationChecklist] = useState<InformationChecklist[]>([
     { id: 'tipo_tecido', label: 'Tipo de tecido identificado', checked: false, required: true },
     { id: 'localizacao', label: 'Localização anatômica', checked: false, required: true },
     { id: 'coloracao', label: 'Coloração da amostra', checked: false, required: true },
@@ -215,15 +328,184 @@ const SequentialWorkflow: React.FC<SequentialWorkflowProps> = ({
 
 
 
-  // Step 3: Review transcription
-  const completeReview = useCallback(() => {
-    // Remover validação de checklist - agora é apenas referência
-    setResults(prev => ({ ...prev, step: 3 }));
+  // Step 3: Generate Report with AI
+  const generateReport = useCallback(async () => {
+    setLoading(true);
+    try {
+      // First try to use OPENAI_PROMPT_ID approach
+      const response = await fetch('/ai/process-with-structured-functions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+        },
+        body: new URLSearchParams({
+          transcription_text: editedTranscription,
+          vision_measurements: results.visionMeasurements ? JSON.stringify(results.visionMeasurements) : ''
+        })
+      });
+
+      if (!response.ok) {
+        const error = Error(`AI processing failed: ${response.status}`);
+        throw error;
+      }
+
+      const aiResult = await response.json();
+
+      if (aiResult.success) {
+        // Start visual animation
+
+        // Map AI results to form fields with animation
+        const aiData = aiResult.results || {};
+
+        // Simulate animated filling of form fields
+        const fieldGroups = [
+          'preencher_identificacao',
+          'preencher_coloracao',
+          'preencher_consistencia',
+          'preencher_superficie',
+          'identificar_lesoes',
+          'avaliar_inflamacao',
+          'registrar_observacoes',
+          'gerar_conclusao'
+        ];
+
+        // Animate each field group with delay
+        for (let i = 0; i < fieldGroups.length; i++) {
+          setTimeout(() => {
+            setAnimatingField(fieldGroups[i]);
+          }, i * 200);
+        }
+
+        // Complete animation after all fields
+        setTimeout(() => {
+          setAnimatingField(null);
+        }, fieldGroups.length * 200 + 500);
+
+        const newFormData: MacroscopiaFormData = {
+          // preencher_identificacao
+          numero_peca: aiData.preencher_identificacao?.numero_peca || '',
+          tipo_tecido: aiData.preencher_identificacao?.tipo_tecido || '',
+          localizacao: aiData.preencher_identificacao?.localizacao || '',
+          procedencia: aiData.preencher_identificacao?.procedencia || '',
+
+          // preencher_coloracao
+          cor_predominante: aiData.preencher_coloracao?.cor_predominante || '',
+          cor_secundaria: aiData.preencher_coloracao?.cor_secundaria || '',
+          distribuicao: aiData.preencher_coloracao?.distribuicao || '',
+          observacoes_cor: aiData.preencher_coloracao?.observacoes_cor || '',
+
+          // preencher_consistencia
+          consistencia_principal: aiData.preencher_consistencia?.consistencia_principal || '',
+          homogeneidade: aiData.preencher_consistencia?.homogeneidade || '',
+          areas_diferentes: aiData.preencher_consistencia?.areas_diferentes || '',
+
+          // preencher_superficie
+          aspecto_superficie: aiData.preencher_superficie?.aspecto_superficie || '',
+          brilho: aiData.preencher_superficie?.brilho || '',
+          presenca_secrecao: aiData.preencher_superficie?.presenca_secrecao || false,
+          tipo_secrecao: aiData.preencher_superficie?.tipo_secrecao || '',
+
+          // identificar_lesoes
+          presenca_lesoes: aiData.identificar_lesoes?.presenca_lesoes || false,
+          tipo_lesao: aiData.identificar_lesoes?.tipo_lesao || [],
+          localizacao_lesao: aiData.identificar_lesoes?.localizacao_lesao || '',
+          tamanho_aproximado: aiData.identificar_lesoes?.tamanho_aproximado || '',
+          caracteristicas_lesao: aiData.identificar_lesoes?.caracteristicas_lesao || '',
+
+          // avaliar_inflamacao
+          intensidade_inflamacao: aiData.avaliar_inflamacao?.intensidade_inflamacao || '',
+          sinais_presentes: aiData.avaliar_inflamacao?.sinais_presentes || [],
+          distribuicao_inflamacao: aiData.avaliar_inflamacao?.distribuicao_inflamacao || '',
+
+          // registrar_observacoes
+          observacoes_gerais: aiData.registrar_observacoes?.observacoes_gerais || '',
+          particularidades: aiData.registrar_observacoes?.particularidades || '',
+          correlacao_clinica: aiData.registrar_observacoes?.correlacao_clinica || '',
+          recomendacoes: aiData.registrar_observacoes?.recomendacoes || '',
+
+          // gerar_conclusao
+          impressao_diagnostica: aiData.gerar_conclusao?.impressao_diagnostica || '',
+          achados_principais: aiData.gerar_conclusao?.achados_principais || [],
+          necessidade_microscopia: aiData.gerar_conclusao?.necessidade_microscopia || false,
+          observacoes_finais: aiData.gerar_conclusao?.observacoes_finais || ''
+        };
+
+        setFormData(newFormData);
+        setFormGenerated(true);
+        // Stay on step 2 for review, don't auto-advance
+        updateStepCompletion(2, false); // Keep as incomplete until user reviews
+      } else {
+        const error = Error(aiResult.error || 'Failed to process transcription with AI');
+        throw error;
+      }
+    } catch (error: any) {
+      console.error('Error generating report:', error);
+      onError?.(error.message || 'Failed to generate report');
+    } finally {
+      setLoading(false);
+    }
+  }, [editedTranscription, results.visionMeasurements, updateStepCompletion, onError]);
+
+  // Step 2.5: Review form and proceed
+  const reviewFormAndProceed = useCallback(() => {
+    // Mark step 2 as completed and move to step 3
     updateStepCompletion(2, true);
     setActiveStep(3);
   }, [updateStepCompletion]);
 
-  // Step 4: Generate structured form
+  // Step 4: Save to Database
+  const saveToDatabase = useCallback(async () => {
+    setLoading(true);
+    try {
+      // Prepare the complete data structure for saving
+      const completeData = {
+        transcription: editedTranscription,
+        visionMeasurements: results.visionMeasurements,
+        formData: formData,
+        timestamp: new Date().toISOString(),
+        user_id: localStorage.getItem('user_id') // Assuming user ID is stored in localStorage
+      };
+
+      // Save to database via API
+      const response = await fetch('/api/analysis/save', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+        },
+        body: JSON.stringify(completeData)
+      });
+
+      if (!response.ok) {
+        const error = Error(`Failed to save to database: ${response.status}`);
+        throw error;
+      }
+
+      const saveResult = await response.json();
+
+      updateStepCompletion(4, true);
+
+      if (onComplete) {
+        onComplete({
+          ...results,
+          formData: formData,
+          savedId: saveResult.id,
+          step: 5
+        });
+      }
+
+    } catch (error: any) {
+      console.error('Error saving to database:', error);
+      const errorMsg = error?.message || 'Failed to save to database';
+      updateStepCompletion(4, false, errorMsg);
+      if (onError) onError('Failed to save analysis to database');
+    } finally {
+      setLoading(false);
+    }
+  }, [editedTranscription, results, formData, updateStepCompletion, onComplete, onError]);
+
+  // Step 4: Generate structured form (legacy - keeping for compatibility)
   const generateStructuredForm = useCallback(async () => {
     setLoading(true);
     try {
@@ -270,55 +552,9 @@ const SequentialWorkflow: React.FC<SequentialWorkflowProps> = ({
     }
   }, [editedTranscription, results.visionMeasurements, updateStepCompletion, onError]);
 
-  // Step 5: Save to database
-  const saveToDatabase = useCallback(async () => {
-    setLoading(true);
-    try {
-      // Gerar relatório final usando IA
-      const reportResult = await analysisService.generateBiopsyReport(
-        results.structuredData,
-        results.visionMeasurements,
-        editedTranscription
-      );
-      
-      if (!reportResult.success) {
-        const errorMsg = reportResult.error || 'Erro na geração do relatório';
-        updateStepCompletion(4, false, errorMsg);
-        if (onError) onError(errorMsg);
-        return;
-      }
-      
-      const finalResults = {
-        ...results,
-        finalReport: reportResult.report_text || `Relatório de análise completo - ${new Date().toLocaleString()}`,
-        reportMetadata: reportResult.metadata,
-        tokensUsed: reportResult.tokens_used,
-        step: 5
-      };
-      
-      setResults(finalResults);
-      updateStepCompletion(4, true);
-      
-      if (onComplete) onComplete(finalResults);
-      
-    } catch (error: any) {
-      console.error('Erro ao salvar:', error);
-      const errorMsg = error?.message || 'Erro ao salvar no banco';
-      updateStepCompletion(4, false, errorMsg);
-      if (onError) onError('Erro ao salvar análise no banco de dados');
-    } finally {
-      setLoading(false);
-    }
-  }, [results, editedTranscription, updateStepCompletion, onComplete, onError]);
-
-  const handleChecklistChange = (id: string, checked: boolean) => {
-    setInformationChecklist(prev => prev.map(item =>
-      item.id === id ? { ...item, checked } : item
-    ));
-  };
 
   const getStepIcon = (step: WorkflowStep) => {
-    if (step.error) return <Error color="error" />;
+    if (step.error) return <ErrorIcon color="error" />;
     if (step.completed) return <CheckCircle color="success" />;
     if (loading && steps[activeStep]?.id === step.id) return <CircularProgress size={20} />;
     return null;
@@ -609,17 +845,17 @@ const SequentialWorkflow: React.FC<SequentialWorkflowProps> = ({
             </Typography>
             
             <Grid container spacing={2}>
-              <Grid item xs={12}>
+              <Grid item xs={12} md={6}>
                 <Card>
                   <CardContent>
                     <Typography variant="h6" gutterBottom>
                       ✏️ Editar Transcrição do ChatGPT
                     </Typography>
                     <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-                      Revise e edite a transcrição gerada automaticamente pela IA. 
+                      Revise e edite a transcrição gerada automaticamente pela IA.
                       Esta transcrição inclui as medições automáticas e sua descrição oral.
                     </Typography>
-                    
+
                     {transcriptionText && (
                       <Alert severity="info" sx={{ mb: 2 }}>
                         <Typography variant="body2">
@@ -627,7 +863,7 @@ const SequentialWorkflow: React.FC<SequentialWorkflowProps> = ({
                         </Typography>
                       </Alert>
                     )}
-                    
+
                     <TextField
                       fullWidth
                       multiline
@@ -642,16 +878,316 @@ const SequentialWorkflow: React.FC<SequentialWorkflowProps> = ({
                   </CardContent>
                 </Card>
               </Grid>
+
+              <Grid item xs={12} md={6}>
+                <Card>
+                  <CardContent>
+                    <Typography variant="h6" gutterBottom>
+                      📋 Formulário de Macroscopia
+                    </Typography>
+                    <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+                      Campos do formulário que serão preenchidos automaticamente pela IA
+                    </Typography>
+
+                    {/* Formulário de Macroscopia */}
+                    {transcriptionText || editedTranscription ? (
+                      <Box sx={{ maxHeight: '500px', overflowY: 'auto' }}>
+                        {!formGenerated && (
+                          <Alert severity="info" sx={{ mb: 2 }}>
+                            <Typography variant="body2">
+                              📝 Campos prontos para preenchimento. Clique em "Gerar Relatório" para preenchimento automático via IA.
+                            </Typography>
+                          </Alert>
+                        )}
+
+                        {formGenerated && (
+                          <Alert severity="success" sx={{ mb: 2 }}>
+                            <Typography variant="body2">
+                              ✅ Formulário preenchido pela IA! Revise e edite conforme necessário.
+                            </Typography>
+                          </Alert>
+                        )}
+
+                        <Box sx={{
+                          transition: 'all 0.3s ease-in-out',
+                          opacity: formGenerated ? 1 : 0.7
+                        }}>
+                        {/* Abas do formulário */}
+                        <Tabs value={0} variant="scrollable" scrollButtons="auto" sx={{ mb: 2 }}>
+                          <Tab label="Identificação" />
+                          <Tab label="Características" />
+                          <Tab label="Lesões/Inflamação" />
+                          <Tab label="Conclusão" />
+                        </Tabs>
+
+                        {/* Seção Identificação */}
+                        <Box sx={{
+                          mb: 3,
+                          border: animatingField === 'preencher_identificacao' ? '2px solid #1976d2' : 'none',
+                          borderRadius: 1,
+                          p: animatingField === 'preencher_identificacao' ? 1 : 0,
+                          transition: 'all 0.3s ease-in-out',
+                          backgroundColor: animatingField === 'preencher_identificacao' ? '#e3f2fd' : 'transparent'
+                        }}>
+                          <Typography variant="subtitle2" gutterBottom color="primary">
+                            📋 Identificação
+                            {animatingField === 'preencher_identificacao' && (
+                              <Chip
+                                size="small"
+                                label="Preenchendo..."
+                                color="primary"
+                                sx={{ ml: 1, fontSize: '0.7rem' }}
+                              />
+                            )}
+                          </Typography>
+                          <Grid container spacing={2}>
+                            <Grid item xs={12} sm={6}>
+                              <TextField
+                                fullWidth
+                                label="Número da Peça"
+                                value={formData.numero_peca}
+                                onChange={(e) => setFormData(prev => ({ ...prev, numero_peca: e.target.value }))}
+                                size="small"
+                              />
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                              <TextField
+                                fullWidth
+                                label="Tipo de Tecido"
+                                value={formData.tipo_tecido}
+                                onChange={(e) => setFormData(prev => ({ ...prev, tipo_tecido: e.target.value }))}
+                                size="small"
+                                required
+                              />
+                            </Grid>
+                            <Grid item xs={12}>
+                              <TextField
+                                fullWidth
+                                label="Localização"
+                                value={formData.localizacao}
+                                onChange={(e) => setFormData(prev => ({ ...prev, localizacao: e.target.value }))}
+                                size="small"
+                              />
+                            </Grid>
+                            <Grid item xs={12}>
+                              <TextField
+                                fullWidth
+                                label="Procedência"
+                                value={formData.procedencia}
+                                onChange={(e) => setFormData(prev => ({ ...prev, procedencia: e.target.value }))}
+                                size="small"
+                              />
+                            </Grid>
+                          </Grid>
+                        </Box>
+
+                        {/* Seção Coloração */}
+                        <Box sx={{
+                          mb: 3,
+                          border: animatingField === 'preencher_coloracao' ? '2px solid #1976d2' : 'none',
+                          borderRadius: 1,
+                          p: animatingField === 'preencher_coloracao' ? 1 : 0,
+                          transition: 'all 0.3s ease-in-out',
+                          backgroundColor: animatingField === 'preencher_coloracao' ? '#e3f2fd' : 'transparent'
+                        }}>
+                          <Typography variant="subtitle2" gutterBottom color="primary">
+                            🎨 Coloração
+                            {animatingField === 'preencher_coloracao' && (
+                              <Chip
+                                size="small"
+                                label="Preenchendo..."
+                                color="primary"
+                                sx={{ ml: 1, fontSize: '0.7rem' }}
+                              />
+                            )}
+                          </Typography>
+                          <Grid container spacing={2}>
+                            <Grid item xs={12} sm={6}>
+                              <FormControl fullWidth size="small" required>
+                                <InputLabel>Cor Predominante</InputLabel>
+                                <Select
+                                  value={formData.cor_predominante}
+                                  onChange={(e) => setFormData(prev => ({ ...prev, cor_predominante: e.target.value }))}
+                                  label="Cor Predominante"
+                                >
+                                  <MenuItem value="rosada">Rosada</MenuItem>
+                                  <MenuItem value="esbranquiçada">Esbranquiçada</MenuItem>
+                                  <MenuItem value="amarelada">Amarelada</MenuItem>
+                                  <MenuItem value="acastanhada">Acastanhada</MenuItem>
+                                  <MenuItem value="avermelhada">Avermelhada</MenuItem>
+                                  <MenuItem value="arroxeada">Arroxeada</MenuItem>
+                                  <MenuItem value="enegrecida">Enegrecida</MenuItem>
+                                  <MenuItem value="outras">Outras</MenuItem>
+                                </Select>
+                              </FormControl>
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                              <FormControl fullWidth size="small">
+                                <InputLabel>Distribuição</InputLabel>
+                                <Select
+                                  value={formData.distribuicao}
+                                  onChange={(e) => setFormData(prev => ({ ...prev, distribuicao: e.target.value }))}
+                                  label="Distribuição"
+                                >
+                                  <MenuItem value="homogênea">Homogênea</MenuItem>
+                                  <MenuItem value="heterogênea">Heterogênea</MenuItem>
+                                  <MenuItem value="focal">Focal</MenuItem>
+                                  <MenuItem value="difusa">Difusa</MenuItem>
+                                  <MenuItem value="variegada">Variegada</MenuItem>
+                                </Select>
+                              </FormControl>
+                            </Grid>
+                          </Grid>
+                        </Box>
+
+                        {/* Seção Consistência */}
+                        <Box sx={{
+                          mb: 3,
+                          border: animatingField === 'preencher_consistencia' ? '2px solid #1976d2' : 'none',
+                          borderRadius: 1,
+                          p: animatingField === 'preencher_consistencia' ? 1 : 0,
+                          transition: 'all 0.3s ease-in-out',
+                          backgroundColor: animatingField === 'preencher_consistencia' ? '#e3f2fd' : 'transparent'
+                        }}>
+                          <Typography variant="subtitle2" gutterBottom color="primary">
+                            ✋ Consistência
+                            {animatingField === 'preencher_consistencia' && (
+                              <Chip size="small" label="Preenchendo..." color="primary" sx={{ ml: 1, fontSize: '0.7rem' }} />
+                            )}
+                          </Typography>
+                          <Grid container spacing={2}>
+                            <Grid item xs={12} sm={6}>
+                              <FormControl fullWidth size="small" required>
+                                <InputLabel>Consistência Principal</InputLabel>
+                                <Select
+                                  value={formData.consistencia_principal}
+                                  onChange={(e) => setFormData(prev => ({ ...prev, consistencia_principal: e.target.value }))}
+                                  label="Consistência Principal"
+                                >
+                                  <MenuItem value="mole">Mole</MenuItem>
+                                  <MenuItem value="elástica">Elástica</MenuItem>
+                                  <MenuItem value="firme">Firme</MenuItem>
+                                  <MenuItem value="endurecida">Endurecida</MenuItem>
+                                  <MenuItem value="friável">Friável</MenuItem>
+                                  <MenuItem value="gelatinosa">Gelatinosa</MenuItem>
+                                  <MenuItem value="cística">Cística</MenuItem>
+                                </Select>
+                              </FormControl>
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                              <FormControl fullWidth size="small">
+                                <InputLabel>Homogeneidade</InputLabel>
+                                <Select
+                                  value={formData.homogeneidade}
+                                  onChange={(e) => setFormData(prev => ({ ...prev, homogeneidade: e.target.value }))}
+                                  label="Homogeneidade"
+                                >
+                                  <MenuItem value="homogênea">Homogênea</MenuItem>
+                                  <MenuItem value="heterogênea">Heterogênea</MenuItem>
+                                </Select>
+                              </FormControl>
+                            </Grid>
+                          </Grid>
+                        </Box>
+
+                        {/* Seção Superfície */}
+                        <Box sx={{ mb: 3 }}>
+                          <Typography variant="subtitle2" gutterBottom color="primary">
+                            🔍 Superfície
+                          </Typography>
+                          <Grid container spacing={2}>
+                            <Grid item xs={12} sm={6}>
+                              <FormControl fullWidth size="small" required>
+                                <InputLabel>Aspecto da Superfície</InputLabel>
+                                <Select
+                                  value={formData.aspecto_superficie}
+                                  onChange={(e) => setFormData(prev => ({ ...prev, aspecto_superficie: e.target.value }))}
+                                  label="Aspecto da Superfície"
+                                >
+                                  <MenuItem value="lisa">Lisa</MenuItem>
+                                  <MenuItem value="rugosa">Rugosa</MenuItem>
+                                  <MenuItem value="irregular">Irregular</MenuItem>
+                                  <MenuItem value="nodular">Nodular</MenuItem>
+                                  <MenuItem value="ulcerada">Ulcerada</MenuItem>
+                                  <MenuItem value="papilomatosa">Papilomatosa</MenuItem>
+                                </Select>
+                              </FormControl>
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                              <FormControlLabel
+                                control={
+                                  <Checkbox
+                                    checked={formData.presenca_secrecao}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, presenca_secrecao: e.target.checked }))}
+                                  />
+                                }
+                                label="Presença de Secreção"
+                              />
+                            </Grid>
+                          </Grid>
+                        </Box>
+
+                        {/* Seção Conclusão */}
+                        <Box sx={{ mb: 2 }}>
+                          <Typography variant="subtitle2" gutterBottom color="primary">
+                            📝 Impressão Diagnóstica
+                          </Typography>
+                          <TextField
+                            fullWidth
+                            multiline
+                            rows={3}
+                            label="Impressão Diagnóstica"
+                            value={formData.impressao_diagnostica}
+                            onChange={(e) => setFormData(prev => ({ ...prev, impressao_diagnostica: e.target.value }))}
+                            size="small"
+                          />
+                        </Box>
+                        </Box>
+                      </Box>
+                    ) : (
+                      <Box sx={{ textAlign: 'center', py: 4 }}>
+                        <Typography variant="body2" color="textSecondary">
+                          O formulário aparecerá aqui após a transcrição de áudio
+                        </Typography>
+                      </Box>
+                    )}
+                  </CardContent>
+                </Card>
+              </Grid>
             </Grid>
             
             <Box sx={{ mb: 1 }}>
-              <Button
-                variant="contained"
-                onClick={completeReview}
-                sx={{ mt: 1, mr: 1 }}
-              >
-                Revisar Completo
-              </Button>
+              {!formGenerated ? (
+                <Button
+                  variant="contained"
+                  onClick={generateReport}
+                  sx={{ mt: 1, mr: 1 }}
+                  startIcon={loading ? <CircularProgress size={20} /> : <AutoAwesome />}
+                  disabled={loading || !editedTranscription.trim()}
+                >
+                  {loading ? 'Gerando Relatório...' : 'Gerar Relatório'}
+                </Button>
+              ) : (
+                <>
+                  <Button
+                    variant="contained"
+                    onClick={reviewFormAndProceed}
+                    sx={{ mt: 1, mr: 1 }}
+                    startIcon={<CheckCircle />}
+                    color="success"
+                  >
+                    Revisar Formulário Completo
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    onClick={() => setFormGenerated(false)}
+                    sx={{ mt: 1 }}
+                    startIcon={<AutoAwesome />}
+                  >
+                    Gerar Novamente
+                  </Button>
+                </>
+              )}
             </Box>
           </StepContent>
         </Step>

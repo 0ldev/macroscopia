@@ -15,6 +15,7 @@ from api.admin import router as admin_router
 from api.calibration import router as calibration_router
 from api.vision import router as vision_router
 from api.ai import router as ai_router
+from api.analysis import router as analysis_router
 from api.websocket import router as websocket_router
 from api.monitoring import router as monitoring_router
 from services.user_service import UserService
@@ -114,6 +115,7 @@ app.include_router(admin_router)
 app.include_router(calibration_router)
 app.include_router(vision_router)
 app.include_router(ai_router)
+app.include_router(analysis_router)
 app.include_router(websocket_router)
 app.include_router(monitoring_router)
 
