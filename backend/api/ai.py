@@ -3,9 +3,10 @@ Rotas da API de inteligência artificial (OpenAI)
 """
 import base64
 import time
+import json
 from typing import Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy.orm import Session
 try:
     from core.database import get_database_session
@@ -96,6 +97,89 @@ async def transcribe_audio(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erro interno na transcrição: {str(e)}"
+        )
+
+
+@router.post("/transcribe-audio-streaming")
+async def transcribe_audio_streaming(
+    audio_file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_database_session)
+):
+    """Transcreve áudio usando OpenAI com streaming para feedback em tempo real"""
+    try:
+        # Validar arquivo de áudio
+        if not audio_file.content_type.startswith('audio/'):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Arquivo deve ser um áudio válido"
+            )
+        
+        # Ler dados do áudio
+        audio_data = await audio_file.read()
+        
+        if len(audio_data) > 25 * 1024 * 1024:  # 25MB limite do OpenAI
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail="Arquivo de áudio muito grande (máximo 25MB)"
+            )
+        
+        # Determinar formato do áudio
+        audio_format = audio_file.content_type.split('/')[-1]
+        if audio_format in ['mpeg', 'mp3']:
+            audio_format = 'mp3'
+        elif audio_format in ['wav', 'wave']:
+            audio_format = 'wav'
+        elif audio_format == 'ogg':
+            audio_format = 'ogg'
+        else:
+            audio_format = 'wav'  # fallback
+        
+        # Função geradora para streaming
+        async def generate_transcription():
+            try:
+                for chunk in OpenAIService.transcribe_audio_streaming(audio_data, audio_format):
+                    yield f"data: {json.dumps(chunk)}\n\n"
+                    
+                # Log da operação (apenas ao final)
+                await LogService.create_log(
+                    db,
+                    action="transcribe_audio_streaming",
+                    details="Transcrição de áudio com streaming concluída",
+                    user_id=current_user.id
+                )
+                    
+            except Exception as e:
+                error_chunk = {
+                    "type": "transcript.error",
+                    "error": str(e),
+                    "timestamp": time.time()
+                }
+                yield f"data: {json.dumps(error_chunk)}\n\n"
+        
+        return StreamingResponse(
+            generate_transcription(),
+            media_type="text/plain",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no"  # Nginx directive for immediate streaming
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        await LogService.create_log(
+            db,
+            action="transcribe_audio_streaming_error",
+            details=f"Erro na transcrição streaming: {str(e)}",
+            user_id=current_user.id
+        )
+        
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro interno na transcrição streaming: {str(e)}"
         )
 
 
@@ -214,7 +298,7 @@ async def complete_ai_analysis(
     audio_file: Optional[UploadFile] = File(None),
     image_file: Optional[UploadFile] = File(None),
     transcription_text: Optional[str] = Form(None),
-    grid_size_mm: float = Form(5.0),
+    grid_size_mm: float = Form(10.0),
     use_calibration: bool = Form(True),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_database_session)
@@ -524,7 +608,7 @@ async def full_pipeline_analysis(
     audio_file: Optional[UploadFile] = File(None),
     image_file: Optional[UploadFile] = File(None),
     transcription_text: Optional[str] = Form(None),
-    grid_size_mm: float = Form(5.0),
+    grid_size_mm: float = Form(10.0),
     use_structured_functions: bool = Form(True),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_database_session)

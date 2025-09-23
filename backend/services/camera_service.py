@@ -124,8 +124,21 @@ class CameraService:
             # Detectar bordas usando Canny
             edges = cv2.Canny(blurred, 50, 150, apertureSize=3)
             
-            # Detectar linhas usando Hough Transform
-            lines = cv2.HoughLines(edges, 1, np.pi/180, threshold=100)
+            # Detectar linhas usando Hough Transform com threshold adaptativo
+            # Tentar múltiplos thresholds para encontrar grade 10mm
+            thresholds = [60, 80, 100, 120]
+            best_lines = None
+            best_score = 0
+
+            for thresh in thresholds:
+                test_lines = cv2.HoughLines(edges, 1, np.pi/180, threshold=thresh)
+                if test_lines is not None and len(test_lines) >= 6:  # Mínimo para grade
+                    score = len(test_lines) * (1.0 - abs(thresh - 80) / 100)  # Favor threshold ótimo
+                    if score > best_score:
+                        best_score = score
+                        best_lines = test_lines
+
+            lines = best_lines
             
             if lines is None:
                 return {
@@ -154,13 +167,30 @@ class CameraService:
             h_count = len(horizontal_lines)
             v_count = len(vertical_lines)
             
-            # Determinar se uma grade foi detectada
-            grid_detected = h_count >= 3 and v_count >= 3
+            # Determinar se uma grade foi detectada com critérios progressivos
+            grid_detected = False
+            if h_count >= 3 and v_count >= 3:
+                grid_detected = True
+            elif h_count >= 2 and v_count >= 2:  # Critério mais permissivo
+                grid_detected = True
+                print(f"Grade detectada com critérios relaxados: {h_count}h, {v_count}v linhas")
+            elif total_lines >= 6:  # Pelo menos algumas linhas detectadas
+                grid_detected = True
+                print(f"Grade assumida baseada em {total_lines} linhas totais")
             
-            # Calcular confiança baseada na quantidade e regularidade das linhas
-            confidence = min(100, max(0, (total_lines / 20) * 100))
+            # Calcular confiança melhorada para grade 10mm
+            line_density = total_lines / 20
+            grid_balance = min(h_count, v_count) / max(h_count, v_count) if max(h_count, v_count) > 0 else 0
+
+            confidence = 0
             if grid_detected:
-                confidence = min(100, confidence + 30)  # Boost para grades detectadas
+                # Confiança baseada em densidade, balanço e detecção
+                base_confidence = min(0.7, line_density) * 100
+                balance_bonus = grid_balance * 20
+                detection_bonus = 10
+                confidence = min(100, base_confidence + balance_bonus + detection_bonus)
+            else:
+                confidence = min(40, line_density * 100)  # Máx 40% sem grade detectada
             
             return {
                 "grid_detected": grid_detected,
@@ -181,7 +211,7 @@ class CameraService:
             }
     
     @staticmethod
-    def estimate_grid_size(frame: np.ndarray, known_grid_size_mm: float = 5.0) -> Dict:
+    def estimate_grid_size(frame: np.ndarray, known_grid_size_mm: float = 10.0) -> Dict:
         """Estima o tamanho da grade e calcula pixels por mm"""
         try:
             grid_info = CameraService.detect_grid_lines(frame)
@@ -197,7 +227,8 @@ class CameraService:
             # Converter para escala de cinza
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             edges = cv2.Canny(gray, 50, 150)
-            lines = cv2.HoughLines(edges, 1, np.pi/180, threshold=100)
+            # Usar detecção mais robusta
+            lines = cv2.HoughLines(edges, 1, np.pi/180, threshold=80)
             
             if lines is None:
                 return {
@@ -241,8 +272,23 @@ class CameraService:
                     "error": "Não foi possível calcular distância entre linhas"
                 }
             
-            # Calcular pixels por mm baseado no tamanho conhecido da grade
+            # Calcular pixels por mm com validação de consistência
             pixels_per_mm = avg_distance / known_grid_size_mm
+
+            # Validar se o resultado é razoável com auto-correção
+            if pixels_per_mm < 10 or pixels_per_mm > 300:
+                # Tentar uma estimativa baseada no tamanho da imagem
+                estimated_pixels_per_mm = min(frame.shape[0], frame.shape[1]) / 50  # Estimativa conservadora
+
+                return {
+                    "estimated": True,
+                    "pixels_per_mm": float(estimated_pixels_per_mm),
+                    "grid_size_mm": known_grid_size_mm,
+                    "average_line_distance": float(estimated_pixels_per_mm * known_grid_size_mm),
+                    "confidence": 20,  # Baixa confiança para estimativa
+                    "method": "fallback_estimation",
+                    "warning": f"Pixels/mm inválido ({pixels_per_mm:.2f}), usando estimativa: {estimated_pixels_per_mm:.2f}"
+                }
             
             return {
                 "estimated": True,

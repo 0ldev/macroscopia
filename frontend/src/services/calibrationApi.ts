@@ -115,7 +115,7 @@ class CalibrationApi {
   }
 
   // Endpoints de detecção de grade
-  async detectGrid(cameraIndex: number = 0, knownGridSizeMm: number = 5.0): Promise<GridDetectionResult> {
+  async detectGrid(cameraIndex: number = 0, knownGridSizeMm: number = 10.0): Promise<GridDetectionResult> {
     const response = await apiClient.api.post('/calibration/detect-grid', null, {
       params: {
         camera_index: cameraIndex,

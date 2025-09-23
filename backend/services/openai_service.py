@@ -7,6 +7,7 @@ import io
 import base64
 import tempfile
 import json
+import time
 from typing import  Any, Optional, List
 from openai import OpenAI
 import logging
@@ -47,10 +48,10 @@ class OpenAIService:
                 temp_file.write(audio_data)
                 temp_file.flush()
                 
-                # Transcrever usando Whisper
+                # Transcrever usando o novo modelo com melhor qualidade
                 with open(temp_file.name, "rb") as audio_file:
                     transcript = service.client.audio.transcriptions.create(
-                        model="whisper-1",
+                        model="gpt-4o-mini-transcribe",  # Upgrade do whisper-1
                         file=audio_file,
                         language="pt",  # Português
                         response_format="verbose_json"
@@ -79,6 +80,68 @@ class OpenAIService:
                 "duration": 0,
                 "segments": [],
                 "confidence": None
+            }
+
+    @staticmethod
+    def transcribe_audio_streaming(audio_data: bytes, audio_format: str = "wav"):
+        """
+        Transcreve áudio usando OpenAI com streaming para feedback em tempo real
+        
+        Args:
+            audio_data: Dados de áudio em bytes
+            audio_format: Formato do áudio (wav, mp3, etc.)
+            
+        Yields:
+            Dict contendo chunks de transcrição em tempo real
+        """
+        try:
+            service = OpenAIService()
+            
+            # Criar arquivo temporário para o áudio
+            with tempfile.NamedTemporaryFile(suffix=f".{audio_format}", delete=False) as temp_file:
+                temp_file.write(audio_data)
+                temp_file.flush()
+                
+                # Transcrever usando streaming
+                with open(temp_file.name, "rb") as audio_file:
+                    stream = service.client.audio.transcriptions.create(
+                        model="gpt-4o-mini-transcribe",
+                        file=audio_file,
+                        language="pt",  # Português
+                        response_format="text",
+                        stream=True
+                    )
+                    
+                    # Processar stream de eventos
+                    full_text = ""
+                    for event in stream:
+                        if hasattr(event, 'text'):
+                            chunk_text = event.text
+                            full_text += chunk_text
+                            
+                            yield {
+                                "type": "transcript.text.delta",
+                                "delta": chunk_text,
+                                "full_text": full_text,
+                                "timestamp": time.time()
+                            }
+                    
+                    # Evento final
+                    yield {
+                        "type": "transcript.text.done",
+                        "full_text": full_text,
+                        "timestamp": time.time()
+                    }
+                
+                # Limpar arquivo temporário
+                os.unlink(temp_file.name)
+                
+        except Exception as e:
+            logger.error(f"Erro na transcrição streaming: {e}")
+            yield {
+                "type": "transcript.error",
+                "error": str(e),
+                "timestamp": time.time()
             }
     
     @staticmethod

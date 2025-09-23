@@ -50,7 +50,7 @@ interface GridDetectionResult {
 const GridCalibrationCamera: React.FC<GridCalibrationCameraProps> = ({
   onGridDetected,
   onError,
-  gridSizeMm = 5.0,
+  gridSizeMm = 10.0, // Padrão 1cm x 1cm
   cameraIndex = 0
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);

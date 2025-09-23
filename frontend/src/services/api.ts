@@ -144,7 +144,7 @@ class ApiClient {
   }
 
   // Métodos de visão computacional
-  async analyzeImage(imageFile: File, gridSize: number = 5.0, useCalibration: boolean = true): Promise<any> {
+  async analyzeImage(imageFile: File, gridSize: number = 10.0, useCalibration: boolean = true): Promise<any> {
     const formData = new FormData();
     formData.append('image_file', imageFile);
     formData.append('grid_size_mm', gridSize.toString());
@@ -156,7 +156,7 @@ class ApiClient {
     return response.data;
   }
 
-  async analyzeCameraImage(cameraIndex: number = 0, gridSize: number = 5.0, useCalibration: boolean = true): Promise<any> {
+  async analyzeCameraImage(cameraIndex: number = 0, gridSize: number = 10.0, useCalibration: boolean = true): Promise<any> {
     const response = await this.api.post('/vision/analyze-from-camera', {
       camera_index: cameraIndex,
       grid_size_mm: gridSize,

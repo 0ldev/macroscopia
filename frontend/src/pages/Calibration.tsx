@@ -37,6 +37,7 @@ import Layout from '../components/Layout/Layout';
 import CameraSetup from '../components/Calibration/CameraSetup';
 import AudioSetup from '../components/Calibration/AudioSetup';
 import GridCalibrationCamera from '../components/Calibration/GridCalibrationCamera';
+import ManualGridSizeConfig from '../components/Calibration/ManualGridSizeConfig';
 import { CameraSettings, AudioSettings } from '../types/calibration';
 import { calibrationApi } from '../services/calibrationApi';
 import { useCalibrationStatus } from '../hooks/useCalibrationStatus';
@@ -80,7 +81,7 @@ const Calibration: React.FC = () => {
   });
   
   const [gridConfig, setGridConfig] = useState({
-    sizeMm: 5.0,
+    sizeMm: 10.0, // Padrão 1cm x 1cm
     detectionConfidence: 0,
     calibrationId: null as number | null
   });
@@ -89,6 +90,7 @@ const Calibration: React.FC = () => {
   const [cameraDialog, setCameraDialog] = useState(false);
   const [audioDialog, setAudioDialog] = useState(false);
   const [gridDialog, setGridDialog] = useState(false);
+  const [manualGridDialog, setManualGridDialog] = useState(false);
 
   // Initialize local configs based on synchronized status
   useEffect(() => {
@@ -127,7 +129,7 @@ const Calibration: React.FC = () => {
       updateComponentStatus('camera', 'testing');
       
       const calibrationData = {
-        grid_size_mm: gridConfig.sizeMm || 5.0,
+        grid_size_mm: gridConfig.sizeMm || 10.0,
         camera_settings: cameraConfig.settings,
         audio_settings: audioConfig.settings
       };
@@ -148,7 +150,7 @@ const Calibration: React.FC = () => {
       updateComponentStatus('audio', 'testing');
       
       const calibrationData = {
-        grid_size_mm: gridConfig.sizeMm || 5.0,
+        grid_size_mm: gridConfig.sizeMm || 10.0,
         camera_settings: cameraConfig.settings,
         audio_settings: audioConfig.settings
       };
@@ -352,7 +354,7 @@ const Calibration: React.FC = () => {
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
                     <GridOn color="primary" />
                     <Typography variant="h6">
-                      Detecção de Grade
+                      Calibração da Grade
                     </Typography>
                     <Box sx={{ ml: 'auto' }}>
                       <Chip 
@@ -365,26 +367,37 @@ const Calibration: React.FC = () => {
                   </Box>
                   
                   <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-                    Calibre o sistema para detectar automaticamente o papel quadriculado para medições precisas.
+                    Configure o tamanho dos quadrados do papel quadriculado manualmente ou use detecção automática.
                   </Typography>
                   
                   {status?.componentStatus.grid === 'configured' && (
                     <Box sx={{ mb: 2 }}>
                       <Typography variant="caption" color="success.main">
-                        ✓ Grade configurada: {gridConfig.sizeMm}mm, Confiança: {(gridConfig.detectionConfidence * 100).toFixed(1)}%
+                        ✓ Grade configurada: {gridConfig.sizeMm}mm x {gridConfig.sizeMm}mm
+                        {gridConfig.detectionConfidence > 0 && ` (Confiança: ${(gridConfig.detectionConfidence * 100).toFixed(1)}%)`}
                       </Typography>
                     </Box>
                   )}
                 </CardContent>
                 
-                <CardActions>
+                <CardActions sx={{ flexDirection: 'column', gap: 1, alignItems: 'stretch' }}>
                   <Button 
                     variant="contained" 
+                    startIcon={<Settings />}
+                    onClick={() => setManualGridDialog(true)}
+                    disabled={status?.componentStatus.grid === 'testing'}
+                    fullWidth
+                  >
+                    Configuração Manual
+                  </Button>
+                  <Button 
+                    variant="outlined" 
                     startIcon={<GridOn />}
                     onClick={() => setGridDialog(true)}
                     disabled={status?.componentStatus.grid === 'testing' || status?.componentStatus.camera !== 'configured'}
+                    fullWidth
                   >
-                    Calibrar Grade
+                    Detecção Automática
                   </Button>
                 </CardActions>
               </Card>
@@ -598,6 +611,49 @@ const Calibration: React.FC = () => {
                   <CircularProgress size={20} />
                 ) : (
                   'Salvar Calibração'
+                )}
+              </Button>
+            </DialogActions>
+          </Dialog>
+
+          {/* Dialog Configuração Manual da Grade */}
+          <Dialog open={manualGridDialog} onClose={() => setManualGridDialog(false)} maxWidth="md" fullWidth>
+            <DialogTitle>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Settings />
+                Configuração Manual da Grade
+              </Box>
+            </DialogTitle>
+            <DialogContent>
+              <ManualGridSizeConfig
+                gridSizeMm={gridConfig.sizeMm}
+                onGridSizeChange={(size) => setGridConfig(prev => ({ ...prev, sizeMm: size }))}
+                disabled={status?.componentStatus.grid === 'testing'}
+              />
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setManualGridDialog(false)}>
+                Cancelar
+              </Button>
+              <Button 
+                variant="contained" 
+                onClick={() => {
+                  // Salvar configuração manual como calibração válida
+                  updateComponentStatus('grid', 'configured');
+                  setGridConfig(prev => ({ ...prev, detectionConfidence: 1.0 })); // Máxima confiança para manual
+                  setManualGridDialog(false);
+                  setSnackbar({ 
+                    open: true, 
+                    message: `Grade configurada manualmente: ${gridConfig.sizeMm}mm x ${gridConfig.sizeMm}mm`, 
+                    severity: 'success' 
+                  });
+                }}
+                disabled={status?.componentStatus.grid === 'testing'}
+              >
+                {status?.componentStatus.grid === 'testing' ? (
+                  <CircularProgress size={20} />
+                ) : (
+                  'Salvar Configuração Manual'
                 )}
               </Button>
             </DialogActions>

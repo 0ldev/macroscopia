@@ -432,7 +432,7 @@ async def detect_silence_threshold(
 @router.post("/detect-grid")
 async def detect_grid(
     camera_index: int = 0,
-    known_grid_size_mm: float = 5.0,
+    known_grid_size_mm: float = 10.0,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_database_session)
 ):
@@ -559,7 +559,7 @@ async def get_default_settings(
             "default_settings": {
                 "camera": default_camera,
                 "audio": default_audio,
-                "grid_size_mm": 5.0
+                "grid_size_mm": 10.0
             }
         }
         

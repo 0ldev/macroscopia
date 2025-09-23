@@ -2,7 +2,7 @@
  * Componente de fluxo sequencial para análise de biópsias
  * Implementa o workflow: Camera → Oral Report → Review → Form → Storage
  */
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   Box,
   Paper,
@@ -17,43 +17,25 @@ import {
   Card,
   CardContent,
   TextField,
-  List,
-  ListItem,
-  ListItemIcon,
-  ListItemText,
   Checkbox,
-  Divider,
   Accordion,
   AccordionSummary,
   AccordionDetails,
   Chip,
   Grid,
-  IconButton,
   CircularProgress,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
 } from '@mui/material';
 import {
-  CameraAlt,
-  Mic,
-  MicOff,
-  Edit,
   AutoAwesome,
   Save,
   CheckCircle,
   Error,
-  Warning,
   Refresh,
-  PlayArrow,
-  Stop,
   ExpandMore,
-  Visibility,
-  PhotoCamera,
 } from '@mui/icons-material';
 import SimpleCameraCapture from './SimpleCameraCapture';
-import { analysisService, VisionAnalysisResult, TranscriptionResult } from '../../services/analysisService';
+import AdvancedAudioRecorder from './AdvancedAudioRecorder';
+import { analysisService, VisionAnalysisResult } from '../../services/analysisService';
 
 interface SequentialWorkflowProps {
   onComplete?: (results: AnalysisResults) => void;
@@ -62,6 +44,7 @@ interface SequentialWorkflowProps {
 
 interface AnalysisResults {
   visionMeasurements?: any;
+  overlayImage?: string;
   audioTranscription?: string;
   structuredData?: any;
   finalReport?: string;
@@ -92,19 +75,12 @@ const SequentialWorkflow: React.FC<SequentialWorkflowProps> = ({
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<AnalysisResults>({ step: 0 });
   
-  // Recording state
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordingTime, setRecordingTime] = useState(0);
-  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  // Transcription state
   const [transcriptionText, setTranscriptionText] = useState('');
   const [editedTranscription, setEditedTranscription] = useState('');
   
   // Measurement confirmation state
-  const [measurementsAccepted, setMeasurementsAccepted] = useState(false);
   const [measurementError, setMeasurementError] = useState<string | null>(null);
-  
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const recordingIntervalRef = useRef<NodeJS.Timeout>();
   
   // Step definitions
   const [steps, setSteps] = useState<WorkflowStep[]>([
@@ -167,7 +143,6 @@ const SequentialWorkflow: React.FC<SequentialWorkflowProps> = ({
   const handleCameraCapture = useCallback(async (imageData: string) => {
     setLoading(true);
     setMeasurementError(null);
-    setMeasurementsAccepted(false);
     
     try {
       // Validar imagem antes de enviar
@@ -198,10 +173,11 @@ const SequentialWorkflow: React.FC<SequentialWorkflowProps> = ({
       }
       
       // Mostrar medidas para revisão (NÃO avançar automaticamente)
-      setResults(prev => ({ 
-        ...prev, 
-        visionMeasurements: visionResult.measurements, 
-        step: 0 
+      setResults(prev => ({
+        ...prev,
+        visionMeasurements: visionResult.measurements,
+        overlayImage: visionResult.overlay_image,
+        step: 0
       }));
       
       // Preparar texto inicial com medidas para transcrição
@@ -223,7 +199,6 @@ const SequentialWorkflow: React.FC<SequentialWorkflowProps> = ({
 
   // Accept measurements and proceed to next step
   const acceptMeasurements = useCallback(() => {
-    setMeasurementsAccepted(true);
     updateStepCompletion(0, true);
     setResults(prev => ({ ...prev, step: 1 }));
     setActiveStep(1);
@@ -233,113 +208,12 @@ const SequentialWorkflow: React.FC<SequentialWorkflowProps> = ({
   const retryMeasurements = useCallback(() => {
     setResults(prev => ({ ...prev, visionMeasurements: undefined }));
     setMeasurementError(null);
-    setMeasurementsAccepted(false);
     setTranscriptionText('');
     setEditedTranscription('');
     updateStepCompletion(0, false);
   }, [updateStepCompletion]);
 
-  // Step 2: Audio recording
-  const startRecording = useCallback(async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
-      const chunks: Blob[] = [];
 
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) chunks.push(event.data);
-      };
-
-      mediaRecorder.onstop = () => {
-        const blob = new Blob(chunks, { type: 'audio/wav' });
-        setAudioBlob(blob);
-        processAudioTranscription(blob);
-      };
-
-      mediaRecorderRef.current = mediaRecorder;
-      setIsRecording(true);
-      setRecordingTime(0);
-      mediaRecorder.start();
-
-      recordingIntervalRef.current = setInterval(() => {
-        setRecordingTime(prev => prev + 1);
-      }, 1000);
-    } catch (error) {
-      if (onError) onError('Erro ao acessar microfone');
-    }
-  }, [onError]);
-
-  const stopRecording = useCallback(() => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
-      setIsRecording(false);
-      
-      if (recordingIntervalRef.current) {
-        clearInterval(recordingIntervalRef.current);
-      }
-    }
-  }, [isRecording]);
-
-  const processAudioTranscription = useCallback(async (audioBlob: Blob) => {
-    setLoading(true);
-    try {
-      // Validar áudio antes de enviar
-      const validation = analysisService.validateAudioForTranscription(audioBlob);
-      if (!validation.valid) {
-        updateStepCompletion(1, false, `Áudio inválido: ${validation.errors.join(', ')}`);
-        if (onError) onError('Áudio inválido para transcrição');
-        return;
-      }
-
-      // Chamar API real de transcrição
-      const transcriptionResult: TranscriptionResult = await analysisService.transcribeAudio(audioBlob);
-      
-      if (!transcriptionResult.success) {
-        const errorMsg = transcriptionResult.error || 'Erro na transcrição';
-        updateStepCompletion(1, false, errorMsg);
-        if (onError) onError(errorMsg);
-        return;
-      }
-      
-      // Obter medidas dos resultados atuais
-      const currentMeasurements = results.visionMeasurements;
-      let measurementsSummary = "";
-      
-      if (currentMeasurements) {
-        measurementsSummary = `\n\n--- RESUMO DAS MEDIÇÕES AUTOMÁTICAS ---\nÁrea: ${currentMeasurements.area_mm2} mm²\nPerímetro: ${currentMeasurements.perimeter_mm} mm\nComprimento máximo: ${currentMeasurements.length_max_mm} mm\nLargura máxima: ${currentMeasurements.width_max_mm} mm\nCircularidade: ${currentMeasurements.circularity}\nConfiança da medição: ${(currentMeasurements.confidence * 100).toFixed(1)}%`;
-      }
-      
-      // Combinar a transcrição inicial, a nova transcrição e as medidas finais
-      const fullTranscription = transcriptionText + transcriptionResult.text + measurementsSummary;
-      setTranscriptionText(fullTranscription);
-      setEditedTranscription(fullTranscription);
-      
-      setResults(prev => ({ ...prev, audioTranscription: fullTranscription, step: 2 }));
-      updateStepCompletion(1, true);
-      setActiveStep(2);
-      
-      // Auto-check some checklist items based on transcription content
-      const transcriptionLower = transcriptionResult.text.toLowerCase();
-      setInformationChecklist(prev => prev.map(item => ({
-        ...item,
-        checked: item.checked || (
-          (item.id === 'tipo_tecido' && /tecido|biópsia|amostra/i.test(transcriptionResult.text)) ||
-          (item.id === 'localizacao' && /região|local|área|zona/i.test(transcriptionResult.text)) ||
-          (item.id === 'coloracao' && /cor|coloração|rosa|pálido|escuro/i.test(transcriptionResult.text)) ||
-          (item.id === 'consistencia' && /consistência|firme|mole|duro|elástico/i.test(transcriptionResult.text))
-        )
-      })));
-      
-    } catch (error: any) {
-      console.error('Erro na transcrição:', error);
-      const errorMsg = error?.message || 'Erro na transcrição';
-      updateStepCompletion(1, false, errorMsg);
-      if (onError) onError('Erro ao processar transcrição de áudio');
-    } finally {
-      setLoading(false);
-    }
-  }, [transcriptionText, results.visionMeasurements, updateStepCompletion, onError]);
 
   // Step 3: Review transcription
   const completeReview = useCallback(() => {
@@ -451,12 +325,6 @@ const SequentialWorkflow: React.FC<SequentialWorkflowProps> = ({
     ));
   };
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
   const getStepIcon = (step: WorkflowStep) => {
     if (step.error) return <Error color="error" />;
     if (step.completed) return <CheckCircle color="success" />;
@@ -542,6 +410,40 @@ const SequentialWorkflow: React.FC<SequentialWorkflowProps> = ({
                       ✅ Medições automáticas concluídas com {(results.visionMeasurements.confidence * 100).toFixed(1)}% de confiança!
                     </Alert>
                     <Paper sx={{ p: 2, backgroundColor: 'success.light' }}>
+
+                      {/* Contour Overlay Image */}
+                      {results.overlayImage && (
+                        <Box sx={{ mb: 3, textAlign: 'center' }}>
+                          <Typography variant="h6" gutterBottom>
+                            🎯 Contorno Detectado
+                          </Typography>
+                          <Paper
+                            sx={{
+                              display: 'inline-block',
+                              p: 1,
+                              backgroundColor: 'white',
+                              border: '2px solid',
+                              borderColor: 'success.main',
+                              borderRadius: 2
+                            }}
+                          >
+                            <img
+                              src={`data:image/jpeg;base64,${results.overlayImage}`}
+                              alt="Contorno da medição detectada"
+                              style={{
+                                maxWidth: '100%',
+                                maxHeight: '400px',
+                                borderRadius: '4px'
+                              }}
+                            />
+                          </Paper>
+                          <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+                            🔍 <strong>Linha verde:</strong> Área medida automaticamente |
+                            <strong>Linhas azuis/vermelhas:</strong> Dimensões principais
+                          </Typography>
+                        </Box>
+                      )}
+
                       <Typography variant="h6" gutterBottom>
                         📏 Resultados das Medições
                       </Typography>
@@ -662,62 +564,25 @@ const SequentialWorkflow: React.FC<SequentialWorkflowProps> = ({
               </Typography>
             </Paper>
 
-            <Card sx={{ mb: 2 }}>
-              <CardContent>
-                <Box sx={{ textAlign: 'center', mb: 2 }}>
-                  {isRecording ? (
-                    <Box>
-                      <IconButton 
-                        onClick={stopRecording}
-                        sx={{ 
-                          width: 80, 
-                          height: 80, 
-                          backgroundColor: 'error.main',
-                          color: 'white',
-                          animation: 'pulse 1.5s infinite'
-                        }}
-                      >
-                        <Stop />
-                      </IconButton>
-                      <Typography variant="h6" sx={{ mt: 1, color: 'error.main' }}>
-                        🔴 {formatTime(recordingTime)}
-                      </Typography>
-                      <Typography variant="body2">
-                        Gravando... Descreva características da amostra
-                      </Typography>
-                    </Box>
-                  ) : (
-                    <Box>
-                      <IconButton 
-                        onClick={startRecording}
-                        sx={{ 
-                          width: 80, 
-                          height: 80, 
-                          backgroundColor: 'primary.main',
-                          color: 'white'
-                        }}
-                      >
-                        <Mic />
-                      </IconButton>
-                      <Typography variant="body2" sx={{ mt: 1 }}>
-                        Iniciar descrição oral
-                      </Typography>
-                    </Box>
-                  )}
-                </Box>
-                
-                {transcriptionText && (
-                  <Paper sx={{ p: 2, backgroundColor: 'info.light', mb: 2 }}>
-                    <Typography variant="subtitle2" gutterBottom>
-                      📝 Transcrição Automática:
-                    </Typography>
-                    <Typography variant="body2" sx={{ fontStyle: 'italic' }}>
-                      {transcriptionText}
-                    </Typography>
-                  </Paper>
-                )}
-              </CardContent>
-            </Card>
+            {/* Novo componente de gravação avançada */}
+            <AdvancedAudioRecorder
+              onTranscriptionComplete={(transcription) => {
+                setTranscriptionText(transcription);
+                setEditedTranscription(transcription);
+                updateStepCompletion(1, true);
+                setResults(prev => ({ ...prev, audioTranscription: transcription, step: 2 }));
+              }}
+              onTranscriptionUpdate={(partialText) => {
+                // Feedback em tempo real durante a transcrição
+                setTranscriptionText(partialText);
+              }}
+              onError={(error) => {
+                updateStepCompletion(1, false, error);
+                if (onError) onError(error);
+              }}
+              disabled={loading}
+              maxDurationSeconds={600} // 10 minutos máximo
+            />
             
             <Box sx={{ mb: 1 }}>
               <Button

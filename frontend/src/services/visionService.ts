@@ -88,7 +88,7 @@ class VisionService {
    */
   static async detectGrid(
     imageData: string, 
-    gridSizeMm: number = 5.0
+    gridSizeMm: number = 10.0
   ): Promise<{ status: string; grid_detection: GridDetectionResult }> {
     try {
       const formData = this.imageDataToFormData(imageData, 'grid_detection.jpg');
@@ -116,7 +116,7 @@ class VisionService {
    */
   static async analyzeBiopsy(
     imageData: string,
-    gridSizeMm: number = 5.0,
+    gridSizeMm: number = 10.0,
     useCalibration: boolean = true
   ): Promise<VisionAnalysisResult> {
     try {
@@ -174,7 +174,7 @@ class VisionService {
    */
   static async detectGridFromCamera(
     cameraIndex: number = 0,
-    knownGridSizeMm: number = 5.0
+    knownGridSizeMm: number = 10.0
   ): Promise<{
     status: string;
     grid_detected: boolean;
@@ -210,7 +210,7 @@ class VisionService {
    */
   static async analyzeFromCamera(
     cameraIndex: number = 0,
-    gridSizeMm: number = 5.0,
+    gridSizeMm: number = 10.0,
     useCalibration: boolean = true
   ): Promise<VisionAnalysisResult> {
     try {
