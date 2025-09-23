@@ -233,13 +233,13 @@ Analise esta transcrição e execute as funções estruturadas para extrair e or
 
     @staticmethod
     def process_transcription_with_functions(
-        transcription_text: str, 
+        transcription_text: str,
         vision_measurements: Optional[dict] = None
     ) -> dict[str, Any]:
         """
-        Alias para backward compatibility - usa Prompt ID da plataforma OpenAI
+        Alias para backward compatibility - usa processamento completo com 8 funções estruturadas
         """
-        return OpenAIService.process_transcription_with_prompt_id(
+        return OpenAIService.process_complete_analysis(
             transcription_text, vision_measurements
         )
 
@@ -346,8 +346,104 @@ MEDIÇÕES DA ANÁLISE DE IMAGEM:
                     },
                     "required": ["tipo_tecido"]
                 }
+            },
+            "preencher_coloracao": {
+                "name": "preencher_coloracao",
+                "description": "Descreve as características de coloração da amostra",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "cor_predominante": {"type": "string", "description": "Cor principal observada na amostra"},
+                        "cor_secundaria": {"type": "string", "description": "Cor secundária, se presente"},
+                        "distribuicao": {"type": "string", "description": "Como as cores estão distribuídas (homogênea, heterogênea, focal, etc.)"},
+                        "observacoes_cor": {"type": "string", "description": "Observações adicionais sobre coloração"}
+                    },
+                    "required": ["cor_predominante"]
+                }
+            },
+            "preencher_consistencia": {
+                "name": "preencher_consistencia",
+                "description": "Avalia a consistência e textura da amostra",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "consistencia_principal": {"type": "string", "description": "Consistência predominante (mole, firme, dura, elástica, etc.)"},
+                        "homogeneidade": {"type": "string", "description": "Se a consistência é homogênea ou heterogênea"},
+                        "areas_diferentes": {"type": "string", "description": "Descrição de áreas com consistência diferente, se presentes"}
+                    },
+                    "required": ["consistencia_principal"]
+                }
+            },
+            "preencher_superficie": {
+                "name": "preencher_superficie",
+                "description": "Descreve características da superfície da amostra",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "aspecto_superficie": {"type": "string", "description": "Aspecto da superfície (lisa, rugosa, irregular, nodular, etc.)"},
+                        "brilho": {"type": "string", "description": "Características de brilho (fosco, brilhante, mate, etc.)"},
+                        "presenca_secrecao": {"type": "boolean", "description": "Se há presença de secreção"},
+                        "tipo_secrecao": {"type": "string", "description": "Tipo de secreção presente, se houver"}
+                    },
+                    "required": ["aspecto_superficie"]
+                }
+            },
+            "identificar_lesoes": {
+                "name": "identificar_lesoes",
+                "description": "Identifica e descreve lesões presentes na amostra",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "presenca_lesoes": {"type": "boolean", "description": "Se há lesões visíveis"},
+                        "tipo_lesao": {"type": "array", "items": {"type": "string"}, "description": "Tipos de lesões identificadas"},
+                        "localizacao_lesao": {"type": "string", "description": "Localização das lesões"},
+                        "tamanho_aproximado": {"type": "string", "description": "Tamanho aproximado das lesões"},
+                        "caracteristicas_lesao": {"type": "string", "description": "Características detalhadas das lesões"}
+                    },
+                    "required": ["presenca_lesoes"]
+                }
+            },
+            "avaliar_inflamacao": {
+                "name": "avaliar_inflamacao",
+                "description": "Avalia sinais de inflamação na amostra",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "intensidade_inflamacao": {"type": "string", "description": "Intensidade da inflamação (ausente, leve, moderada, intensa)"},
+                        "sinais_presentes": {"type": "array", "items": {"type": "string"}, "description": "Sinais inflamatórios presentes"},
+                        "distribuicao_inflamacao": {"type": "string", "description": "Distribuição da inflamação na amostra"}
+                    },
+                    "required": ["intensidade_inflamacao"]
+                }
+            },
+            "registrar_observacoes": {
+                "name": "registrar_observacoes",
+                "description": "Registra observações gerais e achados importantes",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "observacoes_gerais": {"type": "string", "description": "Observações gerais sobre a amostra"},
+                        "particularidades": {"type": "string", "description": "Particularidades ou achados específicos"},
+                        "correlacao_clinica": {"type": "string", "description": "Correlação com dados clínicos, se mencionada"},
+                        "recomendacoes": {"type": "string", "description": "Recomendações para investigação adicional"}
+                    },
+                    "required": ["observacoes_gerais"]
+                }
+            },
+            "gerar_conclusao": {
+                "name": "gerar_conclusao",
+                "description": "Gera conclusão e impressão diagnóstica",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "impressao_diagnostica": {"type": "string", "description": "Impressão diagnóstica baseada nos achados"},
+                        "achados_principais": {"type": "array", "items": {"type": "string"}, "description": "Lista dos principais achados"},
+                        "necessidade_microscopia": {"type": "boolean", "description": "Se é necessária análise microscópica adicional"},
+                        "observacoes_finais": {"type": "string", "description": "Observações finais e considerações diagnósticas"}
+                    },
+                    "required": ["impressao_diagnostica"]
+                }
             }
-            # As outras funções seguem o mesmo padrão...
         }
         
         try:

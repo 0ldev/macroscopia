@@ -17,20 +17,12 @@ import {
   Card,
   CardContent,
   TextField,
-  Checkbox,
   Accordion,
   AccordionSummary,
   AccordionDetails,
   Chip,
   Grid,
   CircularProgress,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
-  FormControlLabel,
-  Tabs,
-  Tab,
 } from '@mui/material';
 import {
   AutoAwesome,
@@ -77,52 +69,15 @@ interface InformationChecklist {
 }
 
 interface MacroscopiaFormData {
-  // preencher_identificacao
-  numero_peca: string;
-  tipo_tecido: string;
-  localizacao: string;
-  procedencia: string;
-
-  // preencher_coloracao
-  cor_predominante: string;
-  cor_secundaria: string;
-  distribuicao: string;
-  observacoes_cor: string;
-
-  // preencher_consistencia
-  consistencia_principal: string;
-  homogeneidade: string;
-  areas_diferentes: string;
-
-  // preencher_superficie
-  aspecto_superficie: string;
-  brilho: string;
-  presenca_secrecao: boolean;
-  tipo_secrecao: string;
-
-  // identificar_lesoes
-  presenca_lesoes: boolean;
-  tipo_lesao: string[];
-  localizacao_lesao: string;
-  tamanho_aproximado: string;
-  caracteristicas_lesao: string;
-
-  // avaliar_inflamacao
-  intensidade_inflamacao: string;
-  sinais_presentes: string[];
-  distribuicao_inflamacao: string;
-
-  // registrar_observacoes
-  observacoes_gerais: string;
-  particularidades: string;
-  correlacao_clinica: string;
-  recomendacoes: string;
-
-  // gerar_conclusao
-  impressao_diagnostica: string;
-  achados_principais: string[];
-  necessidade_microscopia: boolean;
-  observacoes_finais: string;
+  // 8 campos correspondentes às 8 funções do functions.md
+  preencher_identificacao: string;
+  preencher_coloracao: string;
+  preencher_consistencia: string;
+  preencher_superficie: string;
+  identificar_lesoes: string;
+  avaliar_inflamacao: string;
+  registrar_observacoes: string;
+  gerar_conclusao: string;
 }
 
 const SequentialWorkflow: React.FC<SequentialWorkflowProps> = ({
@@ -145,56 +100,41 @@ const SequentialWorkflow: React.FC<SequentialWorkflowProps> = ({
   const [animatingField, setAnimatingField] = useState<string | null>(null);
 
   const [formData, setFormData] = useState<MacroscopiaFormData>({
-    // preencher_identificacao
-    numero_peca: '',
-    tipo_tecido: '',
-    localizacao: '',
-    procedencia: '',
-
-    // preencher_coloracao
-    cor_predominante: '',
-    cor_secundaria: '',
-    distribuicao: '',
-    observacoes_cor: '',
-
-    // preencher_consistencia
-    consistencia_principal: '',
-    homogeneidade: '',
-    areas_diferentes: '',
-
-    // preencher_superficie
-    aspecto_superficie: '',
-    brilho: '',
-    presenca_secrecao: false,
-    tipo_secrecao: '',
-
-    // identificar_lesoes
-    presenca_lesoes: false,
-    tipo_lesao: [],
-    localizacao_lesao: '',
-    tamanho_aproximado: '',
-    caracteristicas_lesao: '',
-
-    // avaliar_inflamacao
-    intensidade_inflamacao: '',
-    sinais_presentes: [],
-    distribuicao_inflamacao: '',
-
-    // registrar_observacoes
-    observacoes_gerais: '',
-    particularidades: '',
-    correlacao_clinica: '',
-    recomendacoes: '',
-
-    // gerar_conclusao
-    impressao_diagnostica: '',
-    achados_principais: [],
-    necessidade_microscopia: false,
-    observacoes_finais: ''
+    preencher_identificacao: '',
+    preencher_coloracao: '',
+    preencher_consistencia: '',
+    preencher_superficie: '',
+    identificar_lesoes: '',
+    avaliar_inflamacao: '',
+    registrar_observacoes: '',
+    gerar_conclusao: ''
   });
 
   const [formGenerated, setFormGenerated] = useState(false);
-  
+
+  // Helper function to format AI function results into readable text
+  const formatFunctionResult = (functionData: any): string => {
+    if (!functionData || typeof functionData !== 'object') {
+      return '';
+    }
+
+    const lines: string[] = [];
+    Object.entries(functionData).forEach(([key, value]) => {
+      if (value) {
+        if (Array.isArray(value)) {
+          if (value.length > 0) {
+            lines.push(`${key}: ${value.join(', ')}`);
+          }
+        } else if (typeof value === 'boolean') {
+          lines.push(`${key}: ${value ? 'Sim' : 'Não'}`);
+        } else {
+          lines.push(`${key}: ${value}`);
+        }
+      }
+    });
+    return lines.join('\n');
+  };
+
   // Step definitions
   const [steps, setSteps] = useState<WorkflowStep[]>([
     {
@@ -351,12 +291,14 @@ const SequentialWorkflow: React.FC<SequentialWorkflowProps> = ({
       }
 
       const aiResult = await response.json();
+      console.log('AI Result:', aiResult);
 
       if (aiResult.success) {
         // Start visual animation
 
         // Map AI results to form fields with animation
         const aiData = aiResult.results || {};
+        console.log('AI Data:', aiData);
 
         // Simulate animated filling of form fields
         const fieldGroups = [
@@ -382,54 +324,19 @@ const SequentialWorkflow: React.FC<SequentialWorkflowProps> = ({
           setAnimatingField(null);
         }, fieldGroups.length * 200 + 500);
 
+        // Convert AI structured data to consolidated text for each function
         const newFormData: MacroscopiaFormData = {
-          // preencher_identificacao
-          numero_peca: aiData.preencher_identificacao?.numero_peca || '',
-          tipo_tecido: aiData.preencher_identificacao?.tipo_tecido || '',
-          localizacao: aiData.preencher_identificacao?.localizacao || '',
-          procedencia: aiData.preencher_identificacao?.procedencia || '',
-
-          // preencher_coloracao
-          cor_predominante: aiData.preencher_coloracao?.cor_predominante || '',
-          cor_secundaria: aiData.preencher_coloracao?.cor_secundaria || '',
-          distribuicao: aiData.preencher_coloracao?.distribuicao || '',
-          observacoes_cor: aiData.preencher_coloracao?.observacoes_cor || '',
-
-          // preencher_consistencia
-          consistencia_principal: aiData.preencher_consistencia?.consistencia_principal || '',
-          homogeneidade: aiData.preencher_consistencia?.homogeneidade || '',
-          areas_diferentes: aiData.preencher_consistencia?.areas_diferentes || '',
-
-          // preencher_superficie
-          aspecto_superficie: aiData.preencher_superficie?.aspecto_superficie || '',
-          brilho: aiData.preencher_superficie?.brilho || '',
-          presenca_secrecao: aiData.preencher_superficie?.presenca_secrecao || false,
-          tipo_secrecao: aiData.preencher_superficie?.tipo_secrecao || '',
-
-          // identificar_lesoes
-          presenca_lesoes: aiData.identificar_lesoes?.presenca_lesoes || false,
-          tipo_lesao: aiData.identificar_lesoes?.tipo_lesao || [],
-          localizacao_lesao: aiData.identificar_lesoes?.localizacao_lesao || '',
-          tamanho_aproximado: aiData.identificar_lesoes?.tamanho_aproximado || '',
-          caracteristicas_lesao: aiData.identificar_lesoes?.caracteristicas_lesao || '',
-
-          // avaliar_inflamacao
-          intensidade_inflamacao: aiData.avaliar_inflamacao?.intensidade_inflamacao || '',
-          sinais_presentes: aiData.avaliar_inflamacao?.sinais_presentes || [],
-          distribuicao_inflamacao: aiData.avaliar_inflamacao?.distribuicao_inflamacao || '',
-
-          // registrar_observacoes
-          observacoes_gerais: aiData.registrar_observacoes?.observacoes_gerais || '',
-          particularidades: aiData.registrar_observacoes?.particularidades || '',
-          correlacao_clinica: aiData.registrar_observacoes?.correlacao_clinica || '',
-          recomendacoes: aiData.registrar_observacoes?.recomendacoes || '',
-
-          // gerar_conclusao
-          impressao_diagnostica: aiData.gerar_conclusao?.impressao_diagnostica || '',
-          achados_principais: aiData.gerar_conclusao?.achados_principais || [],
-          necessidade_microscopia: aiData.gerar_conclusao?.necessidade_microscopia || false,
-          observacoes_finais: aiData.gerar_conclusao?.observacoes_finais || ''
+          preencher_identificacao: formatFunctionResult(aiData.preencher_identificacao),
+          preencher_coloracao: formatFunctionResult(aiData.preencher_coloracao),
+          preencher_consistencia: formatFunctionResult(aiData.preencher_consistencia),
+          preencher_superficie: formatFunctionResult(aiData.preencher_superficie),
+          identificar_lesoes: formatFunctionResult(aiData.identificar_lesoes),
+          avaliar_inflamacao: formatFunctionResult(aiData.avaliar_inflamacao),
+          registrar_observacoes: formatFunctionResult(aiData.registrar_observacoes),
+          gerar_conclusao: formatFunctionResult(aiData.gerar_conclusao)
         };
+
+        console.log('New Form Data:', newFormData);
 
         setFormData(newFormData);
         setFormGenerated(true);
@@ -912,236 +819,57 @@ const SequentialWorkflow: React.FC<SequentialWorkflowProps> = ({
                           transition: 'all 0.3s ease-in-out',
                           opacity: formGenerated ? 1 : 0.7
                         }}>
-                        {/* Abas do formulário */}
-                        <Tabs value={0} variant="scrollable" scrollButtons="auto" sx={{ mb: 2 }}>
-                          <Tab label="Identificação" />
-                          <Tab label="Características" />
-                          <Tab label="Lesões/Inflamação" />
-                          <Tab label="Conclusão" />
-                        </Tabs>
-
-                        {/* Seção Identificação */}
-                        <Box sx={{
-                          mb: 3,
-                          border: animatingField === 'preencher_identificacao' ? '2px solid #1976d2' : 'none',
-                          borderRadius: 1,
-                          p: animatingField === 'preencher_identificacao' ? 1 : 0,
-                          transition: 'all 0.3s ease-in-out',
-                          backgroundColor: animatingField === 'preencher_identificacao' ? '#e3f2fd' : 'transparent'
-                        }}>
-                          <Typography variant="subtitle2" gutterBottom color="primary">
-                            📋 Identificação
-                            {animatingField === 'preencher_identificacao' && (
-                              <Chip
-                                size="small"
-                                label="Preenchendo..."
-                                color="primary"
-                                sx={{ ml: 1, fontSize: '0.7rem' }}
-                              />
-                            )}
-                          </Typography>
                           <Grid container spacing={2}>
-                            <Grid item xs={12} sm={6}>
-                              <TextField
-                                fullWidth
-                                label="Número da Peça"
-                                value={formData.numero_peca}
-                                onChange={(e) => setFormData(prev => ({ ...prev, numero_peca: e.target.value }))}
-                                size="small"
-                              />
-                            </Grid>
-                            <Grid item xs={12} sm={6}>
-                              <TextField
-                                fullWidth
-                                label="Tipo de Tecido"
-                                value={formData.tipo_tecido}
-                                onChange={(e) => setFormData(prev => ({ ...prev, tipo_tecido: e.target.value }))}
-                                size="small"
-                                required
-                              />
-                            </Grid>
-                            <Grid item xs={12}>
-                              <TextField
-                                fullWidth
-                                label="Localização"
-                                value={formData.localizacao}
-                                onChange={(e) => setFormData(prev => ({ ...prev, localizacao: e.target.value }))}
-                                size="small"
-                              />
-                            </Grid>
-                            <Grid item xs={12}>
-                              <TextField
-                                fullWidth
-                                label="Procedência"
-                                value={formData.procedencia}
-                                onChange={(e) => setFormData(prev => ({ ...prev, procedencia: e.target.value }))}
-                                size="small"
-                              />
-                            </Grid>
-                          </Grid>
-                        </Box>
+                            {Object.entries(formData).map(([functionKey, value], index) => {
+                              const functionLabels = {
+                                preencher_identificacao: '📋 Identificação',
+                                preencher_coloracao: '🎨 Coloração',
+                                preencher_consistencia: '✋ Consistência',
+                                preencher_superficie: '🔍 Superfície',
+                                identificar_lesoes: '🔍 Lesões',
+                                avaliar_inflamacao: '🩺 Inflamação',
+                                registrar_observacoes: '📝 Observações',
+                                gerar_conclusao: '📊 Conclusão'
+                              };
 
-                        {/* Seção Coloração */}
-                        <Box sx={{
-                          mb: 3,
-                          border: animatingField === 'preencher_coloracao' ? '2px solid #1976d2' : 'none',
-                          borderRadius: 1,
-                          p: animatingField === 'preencher_coloracao' ? 1 : 0,
-                          transition: 'all 0.3s ease-in-out',
-                          backgroundColor: animatingField === 'preencher_coloracao' ? '#e3f2fd' : 'transparent'
-                        }}>
-                          <Typography variant="subtitle2" gutterBottom color="primary">
-                            🎨 Coloração
-                            {animatingField === 'preencher_coloracao' && (
-                              <Chip
-                                size="small"
-                                label="Preenchendo..."
-                                color="primary"
-                                sx={{ ml: 1, fontSize: '0.7rem' }}
-                              />
-                            )}
-                          </Typography>
-                          <Grid container spacing={2}>
-                            <Grid item xs={12} sm={6}>
-                              <FormControl fullWidth size="small" required>
-                                <InputLabel>Cor Predominante</InputLabel>
-                                <Select
-                                  value={formData.cor_predominante}
-                                  onChange={(e) => setFormData(prev => ({ ...prev, cor_predominante: e.target.value }))}
-                                  label="Cor Predominante"
-                                >
-                                  <MenuItem value="rosada">Rosada</MenuItem>
-                                  <MenuItem value="esbranquiçada">Esbranquiçada</MenuItem>
-                                  <MenuItem value="amarelada">Amarelada</MenuItem>
-                                  <MenuItem value="acastanhada">Acastanhada</MenuItem>
-                                  <MenuItem value="avermelhada">Avermelhada</MenuItem>
-                                  <MenuItem value="arroxeada">Arroxeada</MenuItem>
-                                  <MenuItem value="enegrecida">Enegrecida</MenuItem>
-                                  <MenuItem value="outras">Outras</MenuItem>
-                                </Select>
-                              </FormControl>
-                            </Grid>
-                            <Grid item xs={12} sm={6}>
-                              <FormControl fullWidth size="small">
-                                <InputLabel>Distribuição</InputLabel>
-                                <Select
-                                  value={formData.distribuicao}
-                                  onChange={(e) => setFormData(prev => ({ ...prev, distribuicao: e.target.value }))}
-                                  label="Distribuição"
-                                >
-                                  <MenuItem value="homogênea">Homogênea</MenuItem>
-                                  <MenuItem value="heterogênea">Heterogênea</MenuItem>
-                                  <MenuItem value="focal">Focal</MenuItem>
-                                  <MenuItem value="difusa">Difusa</MenuItem>
-                                  <MenuItem value="variegada">Variegada</MenuItem>
-                                </Select>
-                              </FormControl>
-                            </Grid>
+                              return (
+                                <Grid item xs={12} key={functionKey}>
+                                  <Box sx={{
+                                    border: animatingField === functionKey ? '2px solid #1976d2' : 'none',
+                                    borderRadius: 1,
+                                    p: animatingField === functionKey ? 1 : 0,
+                                    transition: 'all 0.3s ease-in-out',
+                                    backgroundColor: animatingField === functionKey ? '#e3f2fd' : 'transparent'
+                                  }}>
+                                    <TextField
+                                      fullWidth
+                                      multiline
+                                      rows={3}
+                                      label={functionLabels[functionKey as keyof typeof functionLabels]}
+                                      value={value}
+                                      onChange={(e) => setFormData(prev => ({
+                                        ...prev,
+                                        [functionKey]: e.target.value
+                                      }))}
+                                      placeholder={`Campo preenchido automaticamente pela IA com base na função ${functionKey}`}
+                                      variant="outlined"
+                                      size="small"
+                                      InputProps={{
+                                        endAdornment: animatingField === functionKey && (
+                                          <Chip
+                                            size="small"
+                                            label="Preenchendo..."
+                                            color="primary"
+                                            sx={{ fontSize: '0.7rem' }}
+                                          />
+                                        )
+                                      }}
+                                    />
+                                  </Box>
+                                </Grid>
+                              );
+                            })}
                           </Grid>
-                        </Box>
-
-                        {/* Seção Consistência */}
-                        <Box sx={{
-                          mb: 3,
-                          border: animatingField === 'preencher_consistencia' ? '2px solid #1976d2' : 'none',
-                          borderRadius: 1,
-                          p: animatingField === 'preencher_consistencia' ? 1 : 0,
-                          transition: 'all 0.3s ease-in-out',
-                          backgroundColor: animatingField === 'preencher_consistencia' ? '#e3f2fd' : 'transparent'
-                        }}>
-                          <Typography variant="subtitle2" gutterBottom color="primary">
-                            ✋ Consistência
-                            {animatingField === 'preencher_consistencia' && (
-                              <Chip size="small" label="Preenchendo..." color="primary" sx={{ ml: 1, fontSize: '0.7rem' }} />
-                            )}
-                          </Typography>
-                          <Grid container spacing={2}>
-                            <Grid item xs={12} sm={6}>
-                              <FormControl fullWidth size="small" required>
-                                <InputLabel>Consistência Principal</InputLabel>
-                                <Select
-                                  value={formData.consistencia_principal}
-                                  onChange={(e) => setFormData(prev => ({ ...prev, consistencia_principal: e.target.value }))}
-                                  label="Consistência Principal"
-                                >
-                                  <MenuItem value="mole">Mole</MenuItem>
-                                  <MenuItem value="elástica">Elástica</MenuItem>
-                                  <MenuItem value="firme">Firme</MenuItem>
-                                  <MenuItem value="endurecida">Endurecida</MenuItem>
-                                  <MenuItem value="friável">Friável</MenuItem>
-                                  <MenuItem value="gelatinosa">Gelatinosa</MenuItem>
-                                  <MenuItem value="cística">Cística</MenuItem>
-                                </Select>
-                              </FormControl>
-                            </Grid>
-                            <Grid item xs={12} sm={6}>
-                              <FormControl fullWidth size="small">
-                                <InputLabel>Homogeneidade</InputLabel>
-                                <Select
-                                  value={formData.homogeneidade}
-                                  onChange={(e) => setFormData(prev => ({ ...prev, homogeneidade: e.target.value }))}
-                                  label="Homogeneidade"
-                                >
-                                  <MenuItem value="homogênea">Homogênea</MenuItem>
-                                  <MenuItem value="heterogênea">Heterogênea</MenuItem>
-                                </Select>
-                              </FormControl>
-                            </Grid>
-                          </Grid>
-                        </Box>
-
-                        {/* Seção Superfície */}
-                        <Box sx={{ mb: 3 }}>
-                          <Typography variant="subtitle2" gutterBottom color="primary">
-                            🔍 Superfície
-                          </Typography>
-                          <Grid container spacing={2}>
-                            <Grid item xs={12} sm={6}>
-                              <FormControl fullWidth size="small" required>
-                                <InputLabel>Aspecto da Superfície</InputLabel>
-                                <Select
-                                  value={formData.aspecto_superficie}
-                                  onChange={(e) => setFormData(prev => ({ ...prev, aspecto_superficie: e.target.value }))}
-                                  label="Aspecto da Superfície"
-                                >
-                                  <MenuItem value="lisa">Lisa</MenuItem>
-                                  <MenuItem value="rugosa">Rugosa</MenuItem>
-                                  <MenuItem value="irregular">Irregular</MenuItem>
-                                  <MenuItem value="nodular">Nodular</MenuItem>
-                                  <MenuItem value="ulcerada">Ulcerada</MenuItem>
-                                  <MenuItem value="papilomatosa">Papilomatosa</MenuItem>
-                                </Select>
-                              </FormControl>
-                            </Grid>
-                            <Grid item xs={12} sm={6}>
-                              <FormControlLabel
-                                control={
-                                  <Checkbox
-                                    checked={formData.presenca_secrecao}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, presenca_secrecao: e.target.checked }))}
-                                  />
-                                }
-                                label="Presença de Secreção"
-                              />
-                            </Grid>
-                          </Grid>
-                        </Box>
-
-                        {/* Seção Conclusão */}
-                        <Box sx={{ mb: 2 }}>
-                          <Typography variant="subtitle2" gutterBottom color="primary">
-                            📝 Impressão Diagnóstica
-                          </Typography>
-                          <TextField
-                            fullWidth
-                            multiline
-                            rows={3}
-                            label="Impressão Diagnóstica"
-                            value={formData.impressao_diagnostica}
-                            onChange={(e) => setFormData(prev => ({ ...prev, impressao_diagnostica: e.target.value }))}
-                            size="small"
-                          />
-                        </Box>
                         </Box>
                       </Box>
                     ) : (
@@ -1155,7 +883,7 @@ const SequentialWorkflow: React.FC<SequentialWorkflowProps> = ({
                 </Card>
               </Grid>
             </Grid>
-            
+
             <Box sx={{ mb: 1 }}>
               {!formGenerated ? (
                 <Button
@@ -1194,7 +922,7 @@ const SequentialWorkflow: React.FC<SequentialWorkflowProps> = ({
 
         {/* Step 3: Generate Structured Form */}
         <Step>
-          <StepLabel 
+          <StepLabel
             icon={getStepIcon(steps[3])}
             error={!!steps[3].error}
           >
@@ -1204,7 +932,7 @@ const SequentialWorkflow: React.FC<SequentialWorkflowProps> = ({
             <Typography variant="body2" sx={{ mb: 2 }}>
               {steps[3].description}
             </Typography>
-            
+
             <Card sx={{ mb: 2 }}>
               <CardContent>
                 {!steps[3].completed ? (
@@ -1231,7 +959,7 @@ const SequentialWorkflow: React.FC<SequentialWorkflowProps> = ({
                     <Alert severity="success" sx={{ mb: 2 }}>
                       ✅ Formulário estruturado gerado com sucesso!
                     </Alert>
-                    
+
                     {results.structuredData && (
                       <Accordion>
                         <AccordionSummary expandIcon={<ExpandMore />}>
@@ -1250,7 +978,7 @@ const SequentialWorkflow: React.FC<SequentialWorkflowProps> = ({
                 )}
               </CardContent>
             </Card>
-            
+
             <Box sx={{ mb: 1 }}>
               <Button
                 variant="contained"
@@ -1266,7 +994,7 @@ const SequentialWorkflow: React.FC<SequentialWorkflowProps> = ({
 
         {/* Step 4: Save to Database */}
         <Step>
-          <StepLabel 
+          <StepLabel
             icon={getStepIcon(steps[4])}
             error={!!steps[4].error}
           >
@@ -1276,7 +1004,7 @@ const SequentialWorkflow: React.FC<SequentialWorkflowProps> = ({
             <Typography variant="body2" sx={{ mb: 2 }}>
               {steps[4].description}
             </Typography>
-            
+
             <Card sx={{ mb: 2 }}>
               <CardContent>
                 {!steps[4].completed ? (
@@ -1286,7 +1014,7 @@ const SequentialWorkflow: React.FC<SequentialWorkflowProps> = ({
                       Salvar Análise Completa
                     </Typography>
                     <Typography variant="body2" color="textSecondary" sx={{ mb: 3 }}>
-                      Todos os dados serão armazenados no banco de dados
+                      Todos os dados coletados serão salvos no banco
                     </Typography>
                     <Button
                       variant="contained"
@@ -1294,33 +1022,31 @@ const SequentialWorkflow: React.FC<SequentialWorkflowProps> = ({
                       onClick={saveToDatabase}
                       disabled={loading}
                       size="large"
-                      color="success"
                     >
                       {loading ? 'Salvando...' : 'Salvar no Banco'}
                     </Button>
                   </Box>
                 ) : (
-                  <Box sx={{ textAlign: 'center', py: 4 }}>
-                    <CheckCircle sx={{ fontSize: 48, mb: 2, color: 'success.main' }} />
-                    <Typography variant="h5" gutterBottom color="success.main">
-                      ✅ Análise Concluída!
-                    </Typography>
-                    <Typography variant="body1" sx={{ mb: 2 }}>
-                      Todos os dados foram salvos com sucesso no sistema.
-                    </Typography>
-                    <Chip 
-                      label={`Finalizada em ${new Date().toLocaleString()}`}
-                      color="success"
-                      sx={{ mt: 1 }}
-                    />
-                  </Box>
+                  <Alert severity="success">
+                    ✅ Análise salva com sucesso no banco de dados!
+                  </Alert>
                 )}
               </CardContent>
             </Card>
+
+            <Box sx={{ mb: 1 }}>
+              <Button
+                variant="contained"
+                onClick={() => setActiveStep(0)}
+                sx={{ mt: 1, mr: 1 }}
+              >
+                Nova Análise
+              </Button>
+            </Box>
           </StepContent>
         </Step>
       </Stepper>
-      
+
       {loading && (
         <Box sx={{ mt: 2 }}>
           <LinearProgress />
