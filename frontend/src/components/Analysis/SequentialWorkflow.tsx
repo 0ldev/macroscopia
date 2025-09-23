@@ -17,20 +17,15 @@ import {
   Card,
   CardContent,
   TextField,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
   Chip,
   Grid,
   CircularProgress,
 } from '@mui/material';
 import {
   AutoAwesome,
-  Save,
   CheckCircle,
   Error as ErrorIcon,
   Refresh,
-  ExpandMore,
 } from '@mui/icons-material';
 import SimpleCameraCapture from './SimpleCameraCapture';
 import AdvancedAudioRecorder from './AdvancedAudioRecorder';
@@ -111,6 +106,7 @@ const SequentialWorkflow: React.FC<SequentialWorkflowProps> = ({
   });
 
   const [formGenerated, setFormGenerated] = useState(false);
+  const [formSaved, setFormSaved] = useState(false);
 
   // Helper function to format AI function results into readable text
   const formatFunctionResult = (functionData: any): string => {
@@ -153,22 +149,8 @@ const SequentialWorkflow: React.FC<SequentialWorkflowProps> = ({
     },
     {
       id: 2,
-      title: 'Revisão do Relatório',
-      description: 'Revisar e editar transcrição antes do processamento',
-      completed: false,
-      optional: false
-    },
-    {
-      id: 3,
-      title: 'Geração de Formulário',
-      description: 'IA processa dados usando 8 funções estruturadas',
-      completed: false,
-      optional: false
-    },
-    {
-      id: 4,
-      title: 'Armazenamento',
-      description: 'Salvar análise completa no banco de dados',
+      title: 'Edição e Processamento',
+      description: 'Editar transcrição, gerar formulário com IA e salvar no banco',
       completed: false,
       optional: false
     }
@@ -354,24 +336,109 @@ const SequentialWorkflow: React.FC<SequentialWorkflowProps> = ({
     }
   }, [editedTranscription, results.visionMeasurements, updateStepCompletion, onError]);
 
-  // Step 2.5: Review form and proceed
+  // Move to step 2 (Edição e Processamento)
   const reviewFormAndProceed = useCallback(() => {
-    // Mark step 2 as completed and move to step 3
-    updateStepCompletion(2, true);
-    setActiveStep(3);
+    // Mark step 1 as completed and move to step 2
+    updateStepCompletion(1, true);
+    setActiveStep(2);
   }, [updateStepCompletion]);
 
-  // Step 4: Save to Database
-  const saveToDatabase = useCallback(async () => {
+
+  // Step 2: Generate structured form
+  const generateStructuredForm = useCallback(async () => {
+    setLoading(true);
+    try {
+      // First try to use OPENAI_PROMPT_ID approach (same as generateReport)
+      const response = await fetch('/ai/process-with-structured-functions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+        },
+        body: new URLSearchParams({
+          transcription_text: editedTranscription,
+          vision_measurements: results.visionMeasurements ? JSON.stringify(results.visionMeasurements) : ''
+        })
+      });
+
+      if (!response.ok) {
+        const error = Error(`AI processing failed: ${response.status}`);
+        throw error;
+      }
+
+      const aiResult = await response.json();
+
+      if (aiResult.success) {
+        // Map AI results to form fields with animation
+        const aiData = aiResult.results || {};
+
+        // Simulate animated filling of form fields
+        const fieldGroups = [
+          'preencher_identificacao',
+          'preencher_coloracao',
+          'preencher_consistencia',
+          'preencher_superficie',
+          'identificar_lesoes',
+          'avaliar_inflamacao',
+          'registrar_observacoes',
+          'gerar_conclusao'
+        ];
+
+        // Animate each field group with delay
+        for (let i = 0; i < fieldGroups.length; i++) {
+          setTimeout(() => {
+            setAnimatingField(fieldGroups[i]);
+          }, i * 200);
+        }
+
+        // Complete animation after all fields
+        setTimeout(() => {
+          setAnimatingField(null);
+        }, fieldGroups.length * 200 + 500);
+
+        // Convert AI structured data to consolidated text for each function
+        const newFormData: MacroscopiaFormData = {
+          preencher_identificacao: formatFunctionResult(aiData.preencher_identificacao),
+          preencher_coloracao: formatFunctionResult(aiData.preencher_coloracao),
+          preencher_consistencia: formatFunctionResult(aiData.preencher_consistencia),
+          preencher_superficie: formatFunctionResult(aiData.preencher_superficie),
+          identificar_lesoes: formatFunctionResult(aiData.identificar_lesoes),
+          avaliar_inflamacao: formatFunctionResult(aiData.avaliar_inflamacao),
+          registrar_observacoes: formatFunctionResult(aiData.registrar_observacoes),
+          gerar_conclusao: formatFunctionResult(aiData.gerar_conclusao)
+        };
+
+        setFormData(newFormData);
+        setFormGenerated(true);
+        setResults(prev => ({ ...prev, structuredData: aiData, step: 2 }));
+
+        updateStepCompletion(2, true);
+
+      } else {
+        const error = Error(aiResult.error || 'Failed to process transcription with AI');
+        throw error;
+      }
+    } catch (error: any) {
+      console.error('Error generating structured form:', error);
+      const errorMsg = error?.message || 'Failed to generate structured form';
+      updateStepCompletion(2, false, errorMsg);
+      if (onError) onError(errorMsg);
+    } finally {
+      setLoading(false);
+    }
+  }, [editedTranscription, results.visionMeasurements, updateStepCompletion, onError, formatFunctionResult]);
+
+  // Helper function to save form data to database
+  const saveFormToDatabase = useCallback(async (formDataToSave: MacroscopiaFormData) => {
     setLoading(true);
     try {
       // Prepare the complete data structure for saving
       const completeData = {
         transcription: editedTranscription,
         visionMeasurements: results.visionMeasurements,
-        formData: formData,
+        formData: formDataToSave,
         timestamp: new Date().toISOString(),
-        user_id: localStorage.getItem('user_id') // Assuming user ID is stored in localStorage
+        user_id: localStorage.getItem('user_id')
       };
 
       // Save to database via API
@@ -385,79 +452,68 @@ const SequentialWorkflow: React.FC<SequentialWorkflowProps> = ({
       });
 
       if (!response.ok) {
-        const error = Error(`Failed to save to database: ${response.status}`);
-        throw error;
+        const errorMsg = `Failed to save to database: ${response.status}`;
+        if (onError) onError(errorMsg);
+        throw new Error(errorMsg);
       }
 
       const saveResult = await response.json();
+      setFormSaved(true);
 
-      updateStepCompletion(4, true);
-
+      // Call onComplete if provided
       if (onComplete) {
         onComplete({
           ...results,
-          formData: formData,
+          formData: formDataToSave,
           savedId: saveResult.id,
-          step: 5
+          step: 4
         });
       }
 
     } catch (error: any) {
       console.error('Error saving to database:', error);
-      const errorMsg = error?.message || 'Failed to save to database';
-      updateStepCompletion(4, false, errorMsg);
       if (onError) onError('Failed to save analysis to database');
     } finally {
       setLoading(false);
     }
-  }, [editedTranscription, results, formData, updateStepCompletion, onComplete, onError]);
+  }, [editedTranscription, results, onComplete, onError]);
 
-  // Step 4: Generate structured form (legacy - keeping for compatibility)
-  const generateStructuredForm = useCallback(async () => {
-    setLoading(true);
-    try {
-      // Chamar API real para extrair dados estruturados
-      const extractionResult = await analysisService.extractBiopsyData(
-        editedTranscription,
-        results.visionMeasurements
-      );
-      
-      if (!extractionResult.success) {
-        const errorMsg = extractionResult.error || 'Erro na extração de dados';
-        updateStepCompletion(3, false, errorMsg);
-        if (onError) onError(errorMsg);
-        return;
-      }
-      
-      // Usar dados extraídos pela IA ou fallback para estrutura mínima
-      const structuredData = extractionResult.paciente || extractionResult.biópsia || 
-        extractionResult.análise_macroscópica || {
-        biópsia: {
-          tipo_tecido: "Não especificado",
-          local_coleta: "Não especificado",
-          data_coleta: new Date().toISOString().split('T')[0]
-        },
-        análise_macroscópica: {
-          descrição: editedTranscription.substring(0, 500) + "..."
-        },
-        medições: results.visionMeasurements,
-        qualidade_extração: extractionResult.qualidade_extração,
-        tokens_usados: extractionResult.tokens_used
-      };
-      
-      setResults(prev => ({ ...prev, structuredData, step: 4 }));
-      updateStepCompletion(3, true);
-      setActiveStep(4);
-      
-    } catch (error: any) {
-      console.error('Erro na geração do formulário:', error);
-      const errorMsg = error?.message || 'Erro na geração do formulário';
-      updateStepCompletion(3, false, errorMsg);
-      if (onError) onError(errorMsg);
-    } finally {
-      setLoading(false);
-    }
-  }, [editedTranscription, results.visionMeasurements, updateStepCompletion, onError]);
+  // Function to start a new analysis and reset all state
+  const startNewAnalysis = useCallback(() => {
+    // Reset all form state
+    setFormData({
+      preencher_identificacao: '',
+      preencher_coloracao: '',
+      preencher_consistencia: '',
+      preencher_superficie: '',
+      identificar_lesoes: '',
+      avaliar_inflamacao: '',
+      registrar_observacoes: '',
+      gerar_conclusao: ''
+    });
+
+    // Reset workflow state
+    setFormGenerated(false);
+    setFormSaved(false);
+    setAnimatingField(null);
+    setEditedTranscription('');
+    setTranscriptionText('');
+
+    // Reset results
+    setResults({
+      visionMeasurements: null,
+      audioTranscription: '',
+      structuredData: null,
+      finalReport: '',
+      step: 0
+    });
+
+    // Reset all steps
+    setSteps(prev => prev.map(step => ({ ...step, completed: false, error: undefined })));
+
+    // Go back to step 0
+    setActiveStep(0);
+  }, []);
 
 
   const getStepIcon = (step: WorkflowStep) => {
@@ -751,53 +807,73 @@ const SequentialWorkflow: React.FC<SequentialWorkflowProps> = ({
               {steps[2].description}
             </Typography>
             
-            <Grid container spacing={2}>
-              <Grid item xs={12} md={6}>
-                <Card>
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom>
-                      ✏️ Editar Transcrição do ChatGPT
-                    </Typography>
-                    <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-                      Revise e edite a transcrição gerada automaticamente pela IA.
-                      Esta transcrição inclui as medições automáticas e sua descrição oral.
-                    </Typography>
+            {/* Seção 1: Editar Transcrição */}
+            <Card sx={{ mb: 3 }}>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  ✏️ Editar Transcrição
+                </Typography>
+                <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+                  Revise e edite a transcrição gerada automaticamente pela IA.
+                </Typography>
 
-                    {transcriptionText && (
-                      <Alert severity="info" sx={{ mb: 2 }}>
-                        <Typography variant="body2">
-                          <strong>Transcrição Original do ChatGPT:</strong> A IA processou sua gravação e gerou automaticamente este texto.
-                        </Typography>
-                      </Alert>
-                    )}
+                {transcriptionText && (
+                  <Alert severity="info" sx={{ mb: 2 }}>
+                    <Typography variant="body2">
+                      <strong>Transcrição Original:</strong> A IA processou sua gravação e gerou automaticamente este texto.
+                    </Typography>
+                  </Alert>
+                )}
 
-                    <TextField
-                      fullWidth
-                      multiline
-                      rows={8}
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={8}
+                  variant="outlined"
+                  label="Transcrição para edição"
+                  value={editedTranscription}
+                  onChange={(e) => setEditedTranscription(e.target.value)}
+                  placeholder="A transcrição aparecerá aqui para edição..."
+                  helperText="Edite conforme necessário antes de gerar o formulário"
+                />
+
+                {/* Botão Gerar Formulário */}
+                <Box sx={{ mt: 2 }}>
+                  {!formGenerated ? (
+                    <Button
+                      variant="contained"
+                      onClick={generateStructuredForm}
+                      startIcon={loading ? <CircularProgress size={20} /> : <AutoAwesome />}
+                      disabled={loading || !editedTranscription.trim()}
+                      size="large"
+                    >
+                      {loading ? 'Gerando Formulário...' : 'Gerar Formulário com IA'}
+                    </Button>
+                  ) : (
+                    <Button
                       variant="outlined"
-                      label="Transcrição do ChatGPT para edição"
-                      value={editedTranscription}
-                      onChange={(e) => setEditedTranscription(e.target.value)}
-                      placeholder="A transcrição do ChatGPT aparecerá aqui para edição..."
-                      helperText="Edite conforme necessário antes de prosseguir para a geração do formulário estruturado"
-                    />
-                  </CardContent>
-                </Card>
-              </Grid>
+                      onClick={() => setFormGenerated(false)}
+                      startIcon={<AutoAwesome />}
+                    >
+                      Gerar Novamente
+                    </Button>
+                  )}
+                </Box>
+              </CardContent>
+            </Card>
 
-              <Grid item xs={12} md={6}>
-                <Card>
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom>
-                      📋 Formulário de Macroscopia
-                    </Typography>
-                    <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-                      Campos do formulário que serão preenchidos automaticamente pela IA
-                    </Typography>
+            {/* Seção 2: Formulário de Macroscopia */}
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  📋 Formulário de Macroscopia
+                </Typography>
+                <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+                  Campos do formulário que serão preenchidos automaticamente pela IA
+                </Typography>
 
-                    {/* Formulário de Macroscopia */}
-                    {transcriptionText || editedTranscription ? (
+                {/* Formulário de Macroscopia */}
+                {transcriptionText || editedTranscription ? (
                       <Box sx={{ maxHeight: '500px', overflowY: 'auto' }}>
                         {!formGenerated && (
                           <Alert severity="info" sx={{ mb: 2 }}>
@@ -879,172 +955,45 @@ const SequentialWorkflow: React.FC<SequentialWorkflowProps> = ({
                         </Typography>
                       </Box>
                     )}
-                  </CardContent>
-                </Card>
-              </Grid>
-            </Grid>
 
-            <Box sx={{ mb: 1 }}>
-              {!formGenerated ? (
-                <Button
-                  variant="contained"
-                  onClick={generateReport}
-                  sx={{ mt: 1, mr: 1 }}
-                  startIcon={loading ? <CircularProgress size={20} /> : <AutoAwesome />}
-                  disabled={loading || !editedTranscription.trim()}
-                >
-                  {loading ? 'Gerando Relatório...' : 'Gerar Relatório'}
-                </Button>
-              ) : (
-                <>
-                  <Button
-                    variant="contained"
-                    onClick={reviewFormAndProceed}
-                    sx={{ mt: 1, mr: 1 }}
-                    startIcon={<CheckCircle />}
-                    color="success"
-                  >
-                    Revisar Formulário Completo
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    onClick={() => setFormGenerated(false)}
-                    sx={{ mt: 1 }}
-                    startIcon={<AutoAwesome />}
-                  >
-                    Gerar Novamente
-                  </Button>
-                </>
-              )}
-            </Box>
-          </StepContent>
-        </Step>
-
-        {/* Step 3: Generate Structured Form */}
-        <Step>
-          <StepLabel
-            icon={getStepIcon(steps[3])}
-            error={!!steps[3].error}
-          >
-            {steps[3].title}
-          </StepLabel>
-          <StepContent>
-            <Typography variant="body2" sx={{ mb: 2 }}>
-              {steps[3].description}
-            </Typography>
-
-            <Card sx={{ mb: 2 }}>
-              <CardContent>
-                {!steps[3].completed ? (
-                  <Box sx={{ textAlign: 'center', py: 4 }}>
-                    <AutoAwesome sx={{ fontSize: 48, mb: 2, color: 'primary.main' }} />
-                    <Typography variant="h6" gutterBottom>
-                      Pronto para processar com IA
-                    </Typography>
-                    <Typography variant="body2" color="textSecondary" sx={{ mb: 3 }}>
-                      O sistema usará 8 funções estruturadas para extrair dados médicos
-                    </Typography>
+                {/* Botão Salvar no Banco de Dados */}
+                {formGenerated && steps[2].completed && !formSaved && (
+                  <Box sx={{ mt: 2 }}>
                     <Button
                       variant="contained"
-                      startIcon={loading ? <CircularProgress size={20} /> : <AutoAwesome />}
-                      onClick={generateStructuredForm}
+                      onClick={() => saveFormToDatabase(formData)}
+                      startIcon={loading ? <CircularProgress size={20} /> : <CheckCircle />}
                       disabled={loading}
+                      color="primary"
                       size="large"
                     >
-                      {loading ? 'Processando com IA...' : 'Gerar Formulário'}
+                      {loading ? 'Salvando...' : 'Salvar no Banco de Dados'}
                     </Button>
                   </Box>
-                ) : (
-                  <Box>
+                )}
+
+                {/* Feedback de Sucesso */}
+                {formSaved && (
+                  <Box sx={{ mt: 2 }}>
                     <Alert severity="success" sx={{ mb: 2 }}>
-                      ✅ Formulário estruturado gerado com sucesso!
+                      ✅ Análise salva com sucesso no banco de dados!
                     </Alert>
-
-                    {results.structuredData && (
-                      <Accordion>
-                        <AccordionSummary expandIcon={<ExpandMore />}>
-                          <Typography variant="h6">
-                            📊 Dados Estruturados Extraídos
-                          </Typography>
-                        </AccordionSummary>
-                        <AccordionDetails>
-                          <pre style={{ fontSize: '0.8rem', overflow: 'auto' }}>
-                            {JSON.stringify(results.structuredData, null, 2)}
-                          </pre>
-                        </AccordionDetails>
-                      </Accordion>
-                    )}
-                  </Box>
-                )}
-              </CardContent>
-            </Card>
-
-            <Box sx={{ mb: 1 }}>
-              <Button
-                variant="contained"
-                onClick={() => setActiveStep(4)}
-                disabled={!steps[3].completed}
-                sx={{ mt: 1, mr: 1 }}
-              >
-                Próximo
-              </Button>
-            </Box>
-          </StepContent>
-        </Step>
-
-        {/* Step 4: Save to Database */}
-        <Step>
-          <StepLabel
-            icon={getStepIcon(steps[4])}
-            error={!!steps[4].error}
-          >
-            {steps[4].title}
-          </StepLabel>
-          <StepContent>
-            <Typography variant="body2" sx={{ mb: 2 }}>
-              {steps[4].description}
-            </Typography>
-
-            <Card sx={{ mb: 2 }}>
-              <CardContent>
-                {!steps[4].completed ? (
-                  <Box sx={{ textAlign: 'center', py: 4 }}>
-                    <Save sx={{ fontSize: 48, mb: 2, color: 'primary.main' }} />
-                    <Typography variant="h6" gutterBottom>
-                      Salvar Análise Completa
-                    </Typography>
-                    <Typography variant="body2" color="textSecondary" sx={{ mb: 3 }}>
-                      Todos os dados coletados serão salvos no banco
-                    </Typography>
                     <Button
                       variant="contained"
-                      startIcon={loading ? <CircularProgress size={20} /> : <Save />}
-                      onClick={saveToDatabase}
-                      disabled={loading}
-                      size="large"
+                      onClick={startNewAnalysis}
+                      startIcon={<Refresh />}
+                      color="success"
                     >
-                      {loading ? 'Salvando...' : 'Salvar no Banco'}
+                      Nova Análise
                     </Button>
                   </Box>
-                ) : (
-                  <Alert severity="success">
-                    ✅ Análise salva com sucesso no banco de dados!
-                  </Alert>
                 )}
               </CardContent>
             </Card>
-
-            <Box sx={{ mb: 1 }}>
-              <Button
-                variant="contained"
-                onClick={() => setActiveStep(0)}
-                sx={{ mt: 1, mr: 1 }}
-              >
-                Nova Análise
-              </Button>
-            </Box>
           </StepContent>
         </Step>
+
+
       </Stepper>
 
       {loading && (
