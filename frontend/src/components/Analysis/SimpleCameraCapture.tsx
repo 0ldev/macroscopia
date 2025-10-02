@@ -209,7 +209,7 @@ const SimpleCameraCapture: React.FC<SimpleCameraCaptureProps> = ({
   }, [stopCamera]);
 
   return (
-    <Card sx={{ width: '100%' }}>
+   
       <CardContent>
         <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <CameraAlt />
@@ -371,16 +371,7 @@ const SimpleCameraCapture: React.FC<SimpleCameraCaptureProps> = ({
 
           <Grid item xs={12} sm={6}>
             <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', justifyContent: 'flex-end' }}>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={gridOverlay}
-                    onChange={(e) => setGridOverlay(e.target.checked)}
-                    size="small"
-                  />
-                }
-                label="Grade"
-              />
+
               
               <FormControlLabel
                 control={
@@ -412,12 +403,7 @@ const SimpleCameraCapture: React.FC<SimpleCameraCaptureProps> = ({
             color={isStreaming ? 'success' : 'default'}
             icon={isStreaming ? <Videocam /> : <VideocamOff />}
           />
-          <Chip
-            label={gridOverlay ? 'Grade Habilitada' : 'Grade Desabilitada'}
-            size="small"
-            color={gridOverlay ? 'info' : 'default'}
-            icon={<GridOn />}
-          />
+         
           {captureCount > 0 && (
             <Chip
               label={`${captureCount} imagem(ns) capturada(s)`}
@@ -440,7 +426,7 @@ const SimpleCameraCapture: React.FC<SimpleCameraCaptureProps> = ({
           </Typography>
         </Paper>
       </CardContent>
-    </Card>
+
   );
 };
 

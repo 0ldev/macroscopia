@@ -47,8 +47,8 @@ export const useWebSocket = (sessionId: string): UseWebSocketReturn => {
   });
 
   const wsRef = useRef<WebSocket | null>(null);
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
-  const pingIntervalRef = useRef<NodeJS.Timeout>();
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout>(null);
+  const pingIntervalRef = useRef<NodeJS.Timeout>(null);
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 5;
 
