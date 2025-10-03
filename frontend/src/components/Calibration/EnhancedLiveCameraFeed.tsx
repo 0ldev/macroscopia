@@ -117,7 +117,7 @@ const EnhancedLiveCameraFeed: React.FC<EnhancedLiveCameraFeedProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const analysisIntervalRef = useRef<NodeJS.Timeout>();
+  const analysisIntervalRef = useRef<NodeJS.Timeout>(null);
   
   const [state, setState] = useState<CameraState>({
     isStreaming: false,

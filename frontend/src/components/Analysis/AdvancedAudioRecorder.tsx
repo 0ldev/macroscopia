@@ -65,9 +65,9 @@ const AdvancedAudioRecorder: React.FC<AdvancedAudioRecorderProps> = ({
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
-  const animationFrameRef = useRef<number>();
-  const durationIntervalRef = useRef<NodeJS.Timeout>();
-  const abortControllerRef = useRef<AbortController>();
+  const animationFrameRef = useRef<number>(null);
+  const durationIntervalRef = useRef<NodeJS.Timeout>(null);
+  const abortControllerRef = useRef<AbortController>(null);
   
   // Estados de erro
   const [error, setError] = useState<string | null>(null);

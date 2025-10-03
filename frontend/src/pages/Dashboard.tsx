@@ -91,10 +91,10 @@ const Dashboard: React.FC = () => {
             </Avatar>
             
             <Box sx={{ flexGrow: 1 }}>
-              <Typography variant="h4" fontWeight={600} gutterBottom>
+              <Typography sx={{color:'white'}} variant="h4" fontWeight={600} gutterBottom>
                 Bem-vindo, {user?.username}!
               </Typography>
-              <Typography variant="body1" sx={{ opacity: 0.9 }}>
+              <Typography  variant="body1" sx={{color:'white', opacity: 0.9 }}>
                 Sistema de Macroscopia Biomédica - Análise inteligente de biópsias
               </Typography>
               <Box sx={{ mt: 1 }}>

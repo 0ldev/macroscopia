@@ -56,7 +56,7 @@ const GridCalibrationCamera: React.FC<GridCalibrationCameraProps> = ({
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const analysisIntervalRef = useRef<NodeJS.Timeout>();
+  const analysisIntervalRef = useRef<NodeJS.Timeout>(null);
   
   const [isStreaming, setIsStreaming] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
